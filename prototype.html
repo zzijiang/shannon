@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>香农 · matplotlib 入门单元</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<style>
+:root {
+  --bg: #0f1117;
+  --card: #1a1d27;
+  --primary: #6c5ce7;
+  --primary-light: #a29bfe;
+  --success: #00b894;
+  --danger: #ff6b6b;
+  --warning: #feca57;
+  --text: #e2e2e2;
+  --text-dim: #8a8a9a;
+  --border: #2d3044;
+  --radius: 12px;
+  --font: 'Segoe UI', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:var(--font); background:var(--bg); color:var(--text); min-height:100vh; }
+
+/* Header & Nav */
+.header { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--border); background:var(--card); }
+.header h1 { font-size:18px; font-weight:600; color:var(--primary-light); }
+.streak-badge { display:flex; align-items:center; gap:6px; background:linear-gradient(135deg,#f9703e22,#f9703e44); padding:6px 14px; border-radius:20px; font-size:14px; color:#f9703e; font-weight:600; }
+.nav { display:flex; gap:0; padding:0 24px; background:var(--card); border-bottom:1px solid var(--border); }
+.nav-btn { padding:14px 24px; font-size:14px; font-weight:500; border:none; background:none; color:var(--text-dim); cursor:pointer; border-bottom:2px solid transparent; transition:all .2s; font-family:var(--font); }
+.nav-btn:hover { color:var(--text); }
+.nav-btn.active { color:var(--primary-light); border-bottom-color:var(--primary); }
+
+/* Layout */
+.main { max-width:800px; margin:0 auto; padding:32px 24px 120px; }
+.progress-bar-wrap { width:100%; height:6px; background:var(--border); border-radius:3px; margin-bottom:32px; overflow:hidden; }
+.progress-bar-fill { height:100%; background:linear-gradient(90deg,var(--primary),var(--success)); border-radius:3px; transition:width .5s; }
+
+/* Cards */
+.page-card { background:var(--card); border-radius:var(--radius); padding:32px; border:1px solid var(--border); animation:fadeIn .3s; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+.page-label { font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
+.page-title { font-size:22px; font-weight:700; margin-bottom:20px; line-height:1.4; }
+.page-desc { font-size:15px; color:var(--text-dim); line-height:1.7; margin-bottom:24px; }
+
+/* Side by side */
+.side-by-side { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px; }
+.data-table { background:#151822; border-radius:8px; padding:16px; border:1px solid var(--border); }
+.data-table h4 { font-size:13px; color:var(--text-dim); margin-bottom:12px; }
+.data-table table { width:100%; font-size:14px; }
+.data-table td { padding:6px 0; border-bottom:1px solid #1e2230; }
+.data-table td:last-child { text-align:right; font-weight:600; }
+.chart-box { background:#151822; border-radius:8px; padding:16px; border:1px solid var(--border); }
+.chart-box h4 { font-size:13px; color:var(--text-dim); margin-bottom:12px; }
+
+/* Options */
+.options { display:flex; flex-direction:column; gap:10px; margin-top:20px; }
+.options.horizontal { flex-direction:row; flex-wrap:wrap; }
+.opt-btn { display:flex; align-items:center; gap:12px; padding:14px 18px; background:#151822; border:2px solid var(--border); border-radius:10px; color:var(--text); font-size:15px; cursor:pointer; transition:all .2s; font-family:var(--font); text-align:left; }
+.opt-btn:hover { border-color:var(--primary); background:#1c2035; }
+.opt-btn.correct { border-color:var(--success); background:#00b89422; }
+.opt-btn.wrong { border-color:var(--danger); background:#ff6b6b22; }
+.opt-btn .opt-letter { width:28px; height:28px; border-radius:50%; background:var(--border); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0; }
+.opt-btn.correct .opt-letter { background:var(--success); color:#fff; }
+.opt-btn.wrong .opt-letter { background:var(--danger); color:#fff; }
+
+/* Chart options grid */
+.chart-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:20px; }
+.chart-option { background:#151822; border:2px solid var(--border); border-radius:10px; padding:12px; cursor:pointer; transition:all .2s; text-align:center; }
+.chart-option:hover { border-color:var(--primary); }
+.chart-option.correct { border-color:var(--success); background:#00b89415; }
+.chart-option.wrong { border-color:var(--danger); background:#ff6b6b15; }
+.chart-option .opt-text { font-size:12px; color:var(--text-dim); margin-top:6px; }
+
+/* Feedback */
+.feedback { margin-top:20px; padding:16px; border-radius:10px; font-size:14px; line-height:1.6; animation:fadeIn .3s; }
+.feedback.correct { background:#00b89418; border:1px solid #00b89444; color:#55efc4; }
+.feedback.wrong { background:#ff6b6b18; border:1px solid #ff6b6b44; color:#ff8e8e; }
+.feedback.info { background:#6c5ce718; border:1px solid #6c5ce744; color:var(--primary-light); }
+
+/* Code */
+.code-block { background:#0d1017; border-radius:8px; padding:16px 20px; font-family:var(--mono); font-size:14px; line-height:1.7; color:#abb2bf; margin:16px 0; border:1px solid #1e2230; overflow-x:auto; }
+.code-block .kw { color:#c678dd; } .code-block .fn { color:#61afef; } .code-block .str { color:#98c379; }
+.code-block .num { color:#d19a66; } .code-block .cm { color:#5c6370; font-style:italic; }
+.code-inline { background:#1e2230; padding:2px 7px; border-radius:4px; font-family:var(--mono); font-size:13px; color:#e5c07b; }
+
+/* Input */
+.input-line { display:flex; align-items:center; gap:8px; margin:16px 0; font-family:var(--mono); font-size:14px; }
+.input-line input { background:#0d1017; border:2px solid var(--border); border-radius:6px; color:#e5c07b; padding:8px 12px; font-family:var(--mono); font-size:14px; width:140px; outline:none; transition:border-color .2s; }
+.input-line input:focus { border-color:var(--primary); }
+.input-line input.correct { border-color:var(--success); background:#00b89412; }
+.input-line input.wrong { border-color:var(--danger); }
+
+/* Code fill */
+.code-fill { background:#0d1017; border-radius:8px; padding:16px 20px; font-family:var(--mono); font-size:14px; line-height:2.2; color:#abb2bf; margin:16px 0; border:1px solid #1e2230; }
+.code-fill input { background:#1a1f2e; border:2px dashed var(--primary); border-radius:4px; color:#e5c07b; padding:3px 8px; font-family:var(--mono); font-size:14px; outline:none; transition:all .2s; }
+.code-fill input:focus { border-style:solid; border-color:var(--primary-light); }
+.code-fill input.correct { border-color:var(--success); border-style:solid; background:#00b89418; }
+.code-fill input.wrong { border-color:var(--danger); border-style:solid; }
+
+/* Buttons */
+.btn-primary { display:inline-flex; align-items:center; gap:8px; padding:12px 28px; background:var(--primary); color:#fff; border:none; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer; transition:all .2s; font-family:var(--font); margin-top:16px; }
+.btn-primary:hover { background:#5a4bd1; transform:translateY(-1px); }
+.btn-primary:disabled { opacity:.4; cursor:not-allowed; transform:none; }
+.btn-run { background:var(--success); } .btn-run:hover { background:#00a884; }
+.btn-hint { background:transparent; border:1px solid var(--border); color:var(--text-dim); font-size:13px; padding:8px 16px; margin-top:8px; }
+.btn-hint:hover { border-color:var(--primary); color:var(--text); background:#1c2035; }
+.btn-reset { background:transparent; border:1px solid var(--border); color:var(--text-dim); }
+.btn-reset:hover { border-color:var(--danger); color:var(--danger); }
+.next-wrap { display:flex; justify-content:flex-end; margin-top:24px; }
+
+/* Code Editor */
+.code-editor { background:#0d1017; border-radius:8px; border:1px solid #1e2230; overflow:hidden; margin:16px 0; }
+.code-editor-header { display:flex; align-items:center; justify-content:space-between; padding:8px 16px; background:#151822; border-bottom:1px solid #1e2230; font-size:12px; color:var(--text-dim); }
+.code-editor textarea { width:100%; min-height:120px; background:#0d1017; border:none; color:#abb2bf; font-family:var(--mono); font-size:14px; line-height:1.7; padding:16px; resize:vertical; outline:none; tab-size:4; }
+.editor-buttons { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+/* Output */
+.output-area { background:#0d1017; border-radius:8px; border:1px solid #1e2230; margin:12px 0; overflow:hidden; animation:fadeIn .3s; }
+.output-header { padding:8px 16px; font-size:12px; color:var(--text-dim); background:#151822; border-bottom:1px solid #1e2230; }
+.output-body { padding:16px; }
+.output-text { font-family:var(--mono); font-size:13px; color:var(--success); line-height:1.6; white-space:pre-wrap; }
+.output-error { font-family:var(--mono); font-size:13px; color:var(--danger); line-height:1.6; white-space:pre-wrap; }
+.output-img { max-width:100%; border-radius:6px; margin-top:8px; }
+
+/* Loading */
+.loading-box { text-align:center; padding:60px 20px; }
+.loading-box .spinner { width:40px; height:40px; border:3px solid var(--border); border-top-color:var(--primary); border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 16px; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.loading-box p { color:var(--text-dim); font-size:14px; }
+.pyodide-status { font-size:12px; padding:6px 14px; border-radius:20px; display:inline-flex; align-items:center; gap:6px; }
+.pyodide-status.loading { background:#feca5722; color:#feca57; }
+.pyodide-status.ready { background:#00b89422; color:#00b894; }
+.pyodide-status.error { background:#ff6b6b22; color:#ff6b6b; }
+
+/* Project steps dots */
+.project-steps { display:flex; gap:4px; margin-bottom:24px; }
+.project-step-dot { flex:1; height:6px; background:var(--border); border-radius:3px; transition:background .3s; }
+.project-step-dot.done { background:var(--success); }
+.project-step-dot.active { background:var(--primary); }
+
+/* Drills */
+.drill-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+.drill-count { font-size:14px; color:var(--text-dim); }
+.drill-score { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:600; }
+.order-list { display:flex; flex-direction:column; gap:8px; margin-top:16px; }
+.order-item { display:flex; align-items:center; gap:12px; padding:12px 16px; background:#151822; border:2px solid var(--border); border-radius:8px; font-family:var(--mono); font-size:14px; cursor:grab; transition:all .15s; user-select:none; }
+.order-item:hover { border-color:var(--primary); }
+.order-item .order-num { width:24px; height:24px; border-radius:50%; background:var(--border); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:var(--text-dim); font-family:var(--font); }
+.match-item { padding:10px 14px; background:#151822; border:2px solid var(--border); border-radius:8px; font-size:14px; cursor:pointer; transition:all .15s; text-align:center; }
+.match-item:hover { border-color:var(--primary); }
+.match-item.selected { border-color:var(--primary); background:#2a2650; }
+.match-item.matched { border-color:var(--success); background:#00b89418; }
+
+/* Hint */
+.hint-box { background:#6c5ce712; border:1px solid #6c5ce733; border-radius:8px; padding:12px 16px; margin-top:12px; font-size:13px; color:var(--primary-light); line-height:1.6; animation:fadeIn .3s; }
+.hint-box code { background:#1e2230; padding:2px 6px; border-radius:3px; font-family:var(--mono); color:#e5c07b; }
+
+/* Summary */
+.summary-card { text-align:center; padding:48px 32px; }
+.summary-card .emoji { font-size:64px; margin-bottom:16px; }
+.summary-card h2 { font-size:26px; margin-bottom:12px; }
+.summary-card .steps { background:#0d1017; border-radius:8px; padding:20px; text-align:left; font-size:15px; line-height:2; color:var(--text-dim); margin:24px 0; border:1px solid #1e2230; }
+.xp-badge { display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg,var(--primary),#a29bfe); padding:10px 24px; border-radius:24px; font-size:16px; font-weight:700; color:#fff; margin-top:8px; }
+
+/* Confetti */
+.confetti-overlay { position:fixed; top:0;left:0;right:0;bottom:0; pointer-events:none; z-index:9999; }
+.confetti-piece { position:absolute; width:10px; height:10px; border-radius:2px; animation:confettiFall 2.5s ease-out forwards; }
+@keyframes confettiFall { 0%{transform:translateY(-20px) rotate(0);opacity:1} 100%{transform:translateY(100vh) rotate(720deg);opacity:0} }
+
+/* Step done */
+.step-done-banner { display:flex; align-items:center; gap:10px; padding:12px 16px; background:#00b89418; border:1px solid #00b89444; border-radius:8px; margin-top:16px; font-size:14px; color:var(--success); animation:fadeIn .3s; }
+
+/* Goal box */
+.goal-box { background:linear-gradient(135deg,#6c5ce712,#a29bfe08); border:1px solid #6c5ce733; border-radius:10px; padding:16px 20px; margin-bottom:20px; }
+.goal-box h3 { font-size:14px; color:var(--primary-light); margin-bottom:6px; }
+.goal-box p { font-size:14px; color:var(--text-dim); line-height:1.6; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🔬 香农 · matplotlib 入门</h1>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div id="pyodide-status" class="pyodide-status loading">⏳ Python 加载中...</div>
+    <div class="streak-badge">🔥 连续 3 天</div>
+  </div>
+</div>
+
+<nav class="nav">
+  <button class="nav-btn active" onclick="switchSection('explore')">🧭 引导探索</button>
+  <button class="nav-btn" onclick="switchSection('drill')">⚡ 刷卡练习</button>
+  <button class="nav-btn" onclick="switchSection('project')">🚀 项目实战</button>
+</nav>
+
+<div class="main" id="content"></div>
+
+<script>
+// ==================== STATE ====================
+let pyodide = null;
+let pyodideReady = false;
+let pyodideError = false;
+
+const state = {
+  section: 'explore',
+  explore: { page: 0, answered: {} },
+  drill: { index: 0, score: 0, hearts: 3, answered: {}, currentOrder: null, matchState: null },
+  project: { step: -1, outputs: {}, hintLevel: {} }
+};
+
+const chartInstances = {};
+function destroyCharts() {
+  Object.values(chartInstances).forEach(c => { try{c.destroy()}catch(e){} });
+  for (const k in chartInstances) delete chartInstances[k];
+}
+
+// ==================== PYODIDE ====================
+async function initPyodide() {
+  try {
+    updatePyodideStatus('loading', '⏳ 加载 Python...');
+    pyodide = await loadPyodide();
+    updatePyodideStatus('loading', '⏳ 安装 matplotlib...');
+    await pyodide.loadPackage(['matplotlib','numpy']);
+
+    // Try to load Chinese font
+    updatePyodideStatus('loading', '⏳ 配置字体...');
+    try {
+      const resp = await fetch('https://cdn.jsdelivr.net/gh/lxgw/LxgwWenKai@1.330/fonts/TTF/LXGWWenKai-Regular.ttf');
+      if (resp.ok) {
+        const buf = await resp.arrayBuffer();
+        pyodide.FS.writeFile('/tmp/chinese.ttf', new Uint8Array(buf));
+        await pyodide.runPythonAsync(`
+import matplotlib
+matplotlib.use('AGG')
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+fm.fontManager.addfont('/tmp/chinese.ttf')
+plt.rcParams['font.sans-serif'] = ['LXGW WenKai'] + plt.rcParams['font.sans-serif']
+plt.rcParams['axes.unicode_minus'] = False
+`);
+      } else { throw new Error('font fetch failed'); }
+    } catch(e) {
+      console.warn('Chinese font failed, using defaults:', e);
+      await pyodide.runPythonAsync(`
+import matplotlib
+matplotlib.use('AGG')
+import matplotlib.pyplot as plt
+plt.rcParams['axes.unicode_minus'] = False
+`);
+    }
+
+    // Dark theme
+    await pyodide.runPythonAsync(`
+plt.rcParams.update({
+    'figure.facecolor': '#151822',
+    'axes.facecolor': '#0d1017',
+    'text.color': '#e2e2e2',
+    'axes.labelcolor': '#8a8a9a',
+    'xtick.color': '#8a8a9a',
+    'ytick.color': '#8a8a9a',
+    'axes.edgecolor': '#2d3044',
+    'grid.color': '#1e2230',
+    'figure.figsize': [8, 4],
+    'figure.dpi': 100,
+})
+`);
+
+    pyodideReady = true;
+    updatePyodideStatus('ready', '✅ Python 已就绪');
+    if (state.section === 'project') render();
+  } catch(e) {
+    pyodideError = true;
+    updatePyodideStatus('error', '❌ Python 加载失败');
+    console.error('Pyodide init failed:', e);
+  }
+}
+
+function updatePyodideStatus(cls, text) {
+  const el = document.getElementById('pyodide-status');
+  if (el) { el.className = 'pyodide-status ' + cls; el.textContent = text; }
+}
+
+async function executePython(code) {
+  if (!pyodideReady) throw new Error('Python 未就绪');
+
+  // Reset
+  await pyodide.runPythonAsync(`
+import sys, io
+plt.close('all')
+_captured_out = io.StringIO()
+_captured_err = io.StringIO()
+sys.stdout = _captured_out
+sys.stderr = _captured_err
+`);
+
+  let error = null;
+  try {
+    await pyodide.runPythonAsync(code);
+  } catch(e) {
+    error = e.message.split('\n').filter(l => !l.startsWith('  File "<exec>"')).join('\n').trim();
+    // Simplify error for students
+    const lines = error.split('\n');
+    error = lines.slice(Math.max(0, lines.length - 3)).join('\n');
+  }
+
+  const stdout = pyodide.runPython(`
+sys.stdout = sys.__stdout__
+sys.stderr = sys.__stderr__
+_captured_out.getvalue()
+`);
+
+  // Capture plots
+  let plots = [];
+  try {
+    const plotProxy = pyodide.runPython(`
+import io as _io, base64 as _b64
+_plot_results = []
+for _i in plt.get_fignums():
+    _fig = plt.figure(_i)
+    _buf = _io.BytesIO()
+    _fig.savefig(_buf, format='png', dpi=120, bbox_inches='tight')
+    _buf.seek(0)
+    _plot_results.append(_b64.b64encode(_buf.read()).decode())
+plt.close('all')
+_plot_results
+`);
+    plots = plotProxy.toJs();
+    plotProxy.destroy();
+  } catch(e) {}
+
+  return { stdout, error, plots };
+}
+
+// ==================== NAV ====================
+function switchSection(s) {
+  state.section = s;
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    if ((s==='explore' && b.textContent.includes('探索')) ||
+        (s==='drill' && b.textContent.includes('练习')) ||
+        (s==='project' && b.textContent.includes('项目')))
+      b.classList.add('active');
+  });
+  render();
+}
+
+function render() {
+  destroyCharts();
+  const el = document.getElementById('content');
+  if (state.section === 'explore') renderExplore(el);
+  else if (state.section === 'drill') renderDrill(el);
+  else renderProject(el);
+}
+
+// ==================== EXPLORE ====================
+const EXPLORE_TOTAL = 8;
+
+function renderExplore(el) {
+  const p = state.explore.page;
+  const pct = (p / (EXPLORE_TOTAL - 1) * 100).toFixed(0);
+  let html = `<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${pct}%"></div></div>`;
+  html += `<div class="page-card"><div class="page-label">探索 · 第 ${p+1} / ${EXPLORE_TOTAL} 页</div>`;
+  html += [renderE0,renderE1,renderE2,renderE3,renderE4,renderE5,renderE6,renderE7][p]();
+  html += `</div>`;
+  el.innerHTML = html;
+  setTimeout(() => { [initE0,initE1,initE2,initE3,initE4,()=>{},()=>{},()=>{}][p](); }, 50);
+}
+
+function exploreNext() {
+  if (state.explore.page < EXPLORE_TOTAL - 1) { state.explore.page++; render(); window.scrollTo({top:0,behavior:'smooth'}); }
+}
+function answerExplore(page, ans) {
+  if (state.explore.answered[page] !== undefined) return;
+  state.explore.answered[page] = ans; render();
+}
+
+// E0: Hook
+function renderE0() {
+  const a = state.explore.answered[0];
+  return `
+    <h2 class="page-title">哪种方式能让你一眼看出"周三最冷"？</h2>
+    <div class="side-by-side">
+      <div class="data-table"><h4>📋 表格</h4><table>
+        <tr><td>周一</td><td>35°C</td></tr><tr><td>周二</td><td>33°C</td></tr>
+        <tr><td>周三</td><td>29°C</td></tr><tr><td>周四</td><td>31°C</td></tr><tr><td>周五</td><td>36°C</td></tr>
+      </table></div>
+      <div class="chart-box"><h4>📈 折线图</h4><canvas id="chart-e0" height="160"></canvas></div>
+    </div>
+    <div class="options horizontal">
+      <button class="opt-btn ${a==='A'?'wrong':''}" onclick="answerExplore(0,'A')" ${a?'disabled':''}><span class="opt-letter">A</span> 表格</button>
+      <button class="opt-btn ${a==='B'?'correct':''}" onclick="answerExplore(0,'B')" ${a?'disabled':''}><span class="opt-letter">B</span> 折线图</button>
+    </div>
+    ${a==='B'?'<div class="feedback correct">✅ 对！图比表格快 10 倍。今天你要学会<strong>用 3 行 Python 把数字变成图</strong>。</div>':''}
+    ${a==='A'?'<div class="feedback wrong">试试看——你能在 1 秒内从表格里找出最冷的一天吗？图可以一眼看出。正确答案是 <strong>B</strong>。</div>':''}
+    ${a?'<div class="next-wrap"><button class="btn-primary" onclick="exploreNext()">继续 →</button></div>':''}`;
+}
+function initE0() {
+  const ctx = document.getElementById('chart-e0'); if(!ctx) return;
+  chartInstances.e0 = new Chart(ctx, { type:'line', data:{ labels:['周一','周二','周三','周四','周五'], datasets:[{data:[35,33,29,31,36],borderColor:'#6c5ce7',backgroundColor:'#6c5ce744',fill:true,tension:.3,pointRadius:5,pointBackgroundColor:'#6c5ce7'}] }, options:{plugins:{legend:{display:false}},scales:{y:{min:25,max:40,ticks:{color:'#8a8a9a'},grid:{color:'#1e2230'}},x:{ticks:{color:'#8a8a9a'},grid:{color:'#1e2230'}}}} });
+}
+
+// E1: Predict
+function renderE1() {
+  const a = state.explore.answered[1];
+  return `
+    <h2 class="page-title">猜一猜：这段代码会画出什么？</h2>
+    <div class="code-block"><span class="kw">import</span> matplotlib.pyplot <span class="kw">as</span> plt<br><br>plt.<span class="fn">plot</span>([<span class="num">35</span>, <span class="num">33</span>, <span class="num">29</span>, <span class="num">31</span>, <span class="num">36</span>])<br>plt.<span class="fn">show</span>()</div>
+    <p class="page-desc">这 3 行代码运行后，会出现什么图？</p>
+    <div class="chart-grid">
+      <div class="chart-option ${a===0?'correct':(a!==undefined&&a!==0?'wrong':'')}" onclick="answerExplore(1,0)"><canvas id="cp1-0" height="120"></canvas><div class="opt-text">A：先降后升的折线</div></div>
+      <div class="chart-option ${a===1?'wrong':''}" onclick="answerExplore(1,1)"><canvas id="cp1-1" height="120"></canvas><div class="opt-text">B：散落的点</div></div>
+      <div class="chart-option ${a===2?'wrong':''}" onclick="answerExplore(1,2)"><canvas id="cp1-2" height="120"></canvas><div class="opt-text">C：柱状图</div></div>
+      <div class="chart-option ${a===3?'wrong':''}" onclick="answerExplore(1,3)"><canvas id="cp1-3" height="120"></canvas><div class="opt-text">D：一条直线</div></div>
+    </div>
+    ${a===0?'<div class="feedback correct">✅ 好眼力！<code class="code-inline">plot()</code> 把列表里的数字<strong>按顺序连成线</strong>。</div>':''}
+    ${a!==undefined&&a!==0?'<div class="feedback wrong">看——它把 35, 33, 29, 31, 36 依次当成点，用线连起来。答案是 <strong>A</strong>。</div>':''}
+    ${a!==undefined?'<div class="next-wrap"><button class="btn-primary" onclick="exploreNext()">继续 →</button></div>':''}`;
+}
+function initE1() {
+  const scl = {
+    y:{ min:25, max:40, ticks:{color:'#8a8a9a',font:{size:10}}, grid:{color:'#1e2230'} },
+    x:{ ticks:{color:'#8a8a9a',font:{size:10}}, grid:{color:'#1e2230'} }
+  };
+  const base = {plugins:{legend:{display:false}},elements:{point:{radius:4}},animation:false,scales:scl};
+  // A: correct - zigzag down then up (35→33→29→31→36)
+  const c0=document.getElementById('cp1-0');
+  if(c0) chartInstances.c0=new Chart(c0,{type:'line',data:{labels:[0,1,2,3,4],datasets:[{data:[35,33,29,31,36],borderColor:'#6c5ce7',backgroundColor:'#6c5ce722',fill:true,tension:.3,pointBackgroundColor:'#6c5ce7'}]},options:base});
+  // B: scattered dots (no line)
+  const c1=document.getElementById('cp1-1');
+  if(c1) chartInstances.c1=new Chart(c1,{type:'scatter',data:{datasets:[{data:[{x:0,y:35},{x:1,y:33},{x:2,y:29},{x:3,y:31},{x:4,y:36}],backgroundColor:'#6c5ce7',pointRadius:6}]},options:{...base,scales:{...scl,x:{...scl.x,type:'linear',min:-.5,max:4.5}}}});
+  // C: bar chart
+  const c2=document.getElementById('cp1-2');
+  if(c2) chartInstances.c2=new Chart(c2,{type:'bar',data:{labels:[0,1,2,3,4],datasets:[{data:[35,33,29,31,36],backgroundColor:'#6c5ce7',borderRadius:3}]},options:base});
+  // D: straight line going up
+  const c3=document.getElementById('cp1-3');
+  if(c3) chartInstances.c3=new Chart(c3,{type:'line',data:{labels:[0,1,2,3,4],datasets:[{data:[29,31,33,35,37],borderColor:'#6c5ce7',tension:0,pointBackgroundColor:'#6c5ce7'}]},options:base});
+}
+
+// E2: Discover
+function renderE2() {
+  const a = state.explore.answered[2];
+  return `
+    <h2 class="page-title">等一下——x 轴怎么不对？</h2>
+    <p class="page-desc">上一页的代码运行后，画出的图长这样。看看 x 轴——我们想要"周一到周五"，结果却是 <strong>0, 1, 2, 3, 4</strong>。</p>
+    <div class="chart-box" style="margin:0 0 20px 0">
+      <h4>📈 实际运行结果</h4>
+      <canvas id="chart-e2" height="180"></canvas>
+    </div>
+    <div class="code-block">plt.<span class="fn">plot</span>([<span class="num">35</span>, <span class="num">33</span>, <span class="num">29</span>, <span class="num">31</span>, <span class="num">36</span>])<br><span class="cm"># 🤔 只给了一个列表……x 轴的"周一周二"去哪了？</span></div>
+    <p class="page-desc" style="margin-bottom:12px"><strong>问题出在哪？</strong></p>
+    <div class="options">
+      <button class="opt-btn ${a==='A'?'correct':''}" onclick="answerExplore(2,'A')" ${a?'disabled':''}><span class="opt-letter">A</span> 我们只给了温度，没告诉它日期</button>
+      <button class="opt-btn ${a==='B'?'wrong':''}" onclick="answerExplore(2,'B')" ${a?'disabled':''}><span class="opt-letter">B</span> 代码写错了</button>
+      <button class="opt-btn ${a==='C'?'wrong':''}" onclick="answerExplore(2,'C')" ${a?'disabled':''}><span class="opt-letter">C</span> matplotlib 的 bug</button>
+    </div>
+    ${a==='A'?'<div class="feedback correct">✅ 没错！<code class="code-inline">plot([35,33,29,31,36])</code> 只给了 y 值（温度），Python 不知道 x 轴放什么，就自动用了 0,1,2,3,4。要想显示日期，得<strong>再给一个列表</strong>。</div>':''}
+    ${a&&a!=='A'?'<div class="feedback wrong">不是哦。代码没写错，matplotlib 也没 bug。问题是我们只给了一个列表（温度），Python 不知道 x 轴该放什么，就默认用了 0,1,2,3,4。答案是 <strong>A</strong>。</div>':''}
+    ${a?'<div class="next-wrap"><button class="btn-primary" onclick="exploreNext()">继续 →</button></div>':''}`;
+}
+function initE2() {
+  const ctx = document.getElementById('chart-e2'); if (!ctx) return;
+  chartInstances.e2 = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [0, 1, 2, 3, 4],
+      datasets: [{ data: [35,33,29,31,36], borderColor: '#6c5ce7', backgroundColor: '#6c5ce744', fill: true, tension: .3, pointRadius: 5, pointBackgroundColor: '#6c5ce7' }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { min: 25, max: 40, ticks: { color: '#8a8a9a' }, grid: { color: '#1e2230' } },
+        x: { ticks: { color: '#ff6b6b', font: { weight: 'bold', size: 14 } }, grid: { color: '#1e2230' },
+             title: { display: true, text: '← 这里应该是周一到周五，怎么变成数字了？', color: '#ff6b6b', font: { size: 12 } } }
+      }
+    }
+  });
+}
+
+// E3: Two lists - click to place points
+function renderE3() {
+  const a = state.explore.answered[3];
+  return `
+    <h2 class="page-title">两个列表：一个当横轴，一个当纵轴</h2>
+    <div class="code-block">days = [<span class="str">'周一'</span>, <span class="str">'周二'</span>, <span class="str">'周三'</span>, <span class="str">'周四'</span>, <span class="str">'周五'</span>]<br>temps = [<span class="num">35</span>, <span class="num">33</span>, <span class="num">29</span>, <span class="num">31</span>, <span class="num">36</span>]<br><br>plt.<span class="fn">plot</span>(days, temps)  <span class="cm"># 第一个列表→横轴，第二个→纵轴</span></div>
+    <p class="page-desc">点击坐标轴上的位置，<strong>放置每个数据点</strong>：</p>
+    <div class="chart-box" style="margin:20px 0"><canvas id="chart-e3" height="240"></canvas>
+      <div id="e3-info" style="text-align:center;margin-top:8px;font-size:13px;color:var(--text-dim)">已放置 <span id="e3-count">0</span>/5 个点</div>
+    </div>
+    ${a?'<div class="feedback correct">✅ 完美！<code class="code-inline">plt.plot(x, y)</code> = <strong>第一个列表当横轴，第二个当纵轴，对应位置画点连线</strong>。</div><div class="next-wrap"><button class="btn-primary" onclick="exploreNext()">继续 →</button></div>':''}`;
+}
+function initE3() {
+  const ctx = document.getElementById('chart-e3'); if(!ctx) return;
+  const days=['周一','周二','周三','周四','周五'], temps=[35,33,29,31,36];
+  const allPoints = [0,1,2,3,4].map(i=>({x:i,y:temps[i]}));
+  const done = state.explore.answered[3];
+
+  // If already completed, show all 5 points directly
+  if (done) {
+    chartInstances.e3 = new Chart(ctx, {
+      type:'scatter',
+      data:{datasets:[{data:allPoints,pointRadius:8,pointBackgroundColor:'#6c5ce7',pointBorderColor:'#fff',pointBorderWidth:2,showLine:true,borderColor:'#6c5ce7',tension:.3}]},
+      options:{plugins:{legend:{display:false}},scales:{x:{type:'linear',min:-.5,max:4.5,ticks:{color:'#8a8a9a',callback:v=>days[v]||'',stepSize:1},grid:{color:'#1e2230'}},y:{min:25,max:40,ticks:{color:'#8a8a9a',callback:v=>v+'°C'},grid:{color:'#1e2230'}}}}
+    });
+    return;
+  }
+
+  let placed=[];
+  chartInstances.e3 = new Chart(ctx, {
+    type:'scatter',
+    data:{datasets:[{data:[],pointRadius:8,pointBackgroundColor:'#6c5ce7',pointBorderColor:'#fff',pointBorderWidth:2,showLine:true,borderColor:'#6c5ce744',tension:.3}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{type:'linear',min:-.5,max:4.5,ticks:{color:'#8a8a9a',callback:v=>days[v]||'',stepSize:1},grid:{color:'#1e2230'}},y:{min:25,max:40,ticks:{color:'#8a8a9a',callback:v=>v+'°C'},grid:{color:'#1e2230'}}},
+      onClick:(e)=>{
+        if(placed.length>=5) return;
+        const chart=chartInstances.e3, xVal=Math.round(chart.scales.x.getValueForPixel(e.x));
+        if(xVal<0||xVal>4||placed.find(p=>p.x===xVal)) return;
+        placed.push({x:xVal,y:temps[xVal]});
+        chart.data.datasets[0].data=[...placed].sort((a,b)=>a.x-b.x);
+        chart.update();
+        document.getElementById('e3-count').textContent=placed.length;
+        if(placed.length===5){
+          // Brief pause to let student see the completed chart before re-rendering
+          setTimeout(()=>{ state.explore.answered[3]=true; render(); }, 800);
+        }
+      }
+    }
+  });
+}
+
+// E4: Labels
+function renderE4() {
+  const a = state.explore.answered[4];
+  return `
+    <h2 class="page-title">让别人看懂你的图</h2>
+    <p class="page-desc">图画出来了，但发给别人不知道什么意思。加 3 行代码：</p>
+    <div class="code-block">plt.<span class="fn">xlabel</span>(<span class="str">'日期'</span>)    <span class="cm"># 横轴标签</span><br>plt.<span class="fn">ylabel</span>(<span class="str">'温度 (°C)'</span>) <span class="cm"># 纵轴标签</span><br>plt.<span class="fn">title</span>(<span class="str">'本周气温变化'</span>) <span class="cm"># 标题</span></div>
+    <div class="chart-box" style="margin:20px 0"><canvas id="chart-e4" height="220"></canvas></div>
+    ${!a?'<button class="btn-primary" onclick="state.explore.answered[4]=true;render()">✨ 加上标签，看看效果</button>':''}
+    ${a?'<div class="feedback correct">✅ 专业多了！<code class="code-inline">xlabel</code>、<code class="code-inline">ylabel</code>、<code class="code-inline">title</code>——画图永远加这三个。</div><div class="next-wrap"><button class="btn-primary" onclick="exploreNext()">继续 →</button></div>':''}`;
+}
+function initE4() {
+  const ctx=document.getElementById('chart-e4'); if(!ctx) return;
+  const has=state.explore.answered[4];
+  chartInstances.e4=new Chart(ctx,{type:'line',data:{labels:['周一','周二','周三','周四','周五'],datasets:[{data:[35,33,29,31,36],borderColor:'#6c5ce7',backgroundColor:'#6c5ce744',fill:true,tension:.3,pointRadius:5,pointBackgroundColor:'#6c5ce7'}]},
+    options:{plugins:{legend:{display:false},title:{display:has,text:'本周气温变化',color:'#e2e2e2',font:{size:16}}},scales:{y:{ticks:{color:'#8a8a9a'},grid:{color:'#1e2230'},title:{display:has,text:'温度 (°C)',color:'#8a8a9a'}},x:{ticks:{color:'#8a8a9a'},grid:{color:'#1e2230'},title:{display:has,text:'日期',color:'#8a8a9a'}}}}});
+}
+
+// E5: Morph
+function renderE5() {
+  const a = state.explore.answered[5];
+  return `
+    <h2 class="page-title">只改一个词：折线变柱状</h2>
+    <p class="page-desc">折线图用的是 <code class="code-inline">plt.plot()</code>。如果想换成柱状图，只要把函数名换一下：</p>
+    <div class="code-block">plt.<span class="fn">${a?'bar':'????'}</span>(days, temps)</div>
+    <p class="page-desc" style="margin-bottom:12px">把 <code class="code-inline">plot</code> 换成哪个？</p>
+    <div class="options">
+      <button class="opt-btn ${a==='line'?'wrong':''}" onclick="answerExplore(5,'line')" ${a?'disabled':''}><span class="opt-letter">A</span> <code>plt.line(days, temps)</code></button>
+      <button class="opt-btn ${a==='bar'?'correct':(a&&a!=='bar'?'':'')}" onclick="answerExplore(5,'bar')" ${a?'disabled':''}><span class="opt-letter">B</span> <code>plt.bar(days, temps)</code></button>
+      <button class="opt-btn ${a==='column'?'wrong':''}" onclick="answerExplore(5,'column')" ${a?'disabled':''}><span class="opt-letter">C</span> <code>plt.column(days, temps)</code></button>
+    </div>
+    ${a==='bar'?'<div class="feedback correct">✅ <code class="code-inline">plt.bar()</code> = 柱状图（bar 是英文"柱子"的意思）。记住这对搭档：<strong>plot = 折线，bar = 柱状</strong>，同样的数据两种画法。</div><div class="next-wrap"><button class="btn-primary" onclick="exploreNext()">继续 →</button></div>':''}
+    ${a&&a!=='bar'?'<div class="feedback wrong">不是这个哦。在 matplotlib 里，柱状图的函数叫 <code class="code-inline">bar</code>（英文"柱子"）。正确答案是 <strong>B</strong>。</div><div class="next-wrap"><button class="btn-primary" onclick="exploreNext()">继续 →</button></div>':''}`;
+}
+
+// E6: Write code
+function renderE6() {
+  const a = state.explore.answered[6];
+  return `
+    <h2 class="page-title">你来写：画一个水果销量柱状图</h2>
+    <p class="page-desc">数据已准备好，补全 3 个空：</p>
+    <div class="code-fill">
+      <span class="kw">import</span> matplotlib.pyplot <span class="kw">as</span>
+      <input id="fill-1" type="text" style="width:60px" placeholder="___" ${a?'disabled value="plt"':''} class="${a?'correct':''}"><br><br>
+      fruits = [<span class="str">'苹果'</span>, <span class="str">'香蕉'</span>, <span class="str">'橘子'</span>, <span class="str">'葡萄'</span>]<br>
+      sales = [<span class="num">120</span>, <span class="num">85</span>, <span class="num">150</span>, <span class="num">60</span>]<br><br>
+      plt.<input id="fill-2" type="text" style="width:60px" placeholder="___" ${a?'disabled value="bar"':''} class="${a?'correct':''}">(fruits, sales)<br>
+      plt.<span class="fn">title</span>(<span class="str">'水果销量'</span>)<br>
+      plt.<input id="fill-3" type="text" style="width:70px" placeholder="____" ${a?'disabled value="show"':''} class="${a?'correct':''}">()</div>
+    ${!a?'<button class="btn-primary" onclick="checkFills()">▶ 运行代码</button>':''}
+    <div id="fill-result"></div>
+    ${a?`<div class="chart-box" style="margin-top:20px"><canvas id="chart-e6" height="200"></canvas></div>
+    <div class="feedback correct">✅ 你独立写出了完整的 matplotlib 图表！三个关键词：<code class="code-inline">plt</code>、<code class="code-inline">bar</code>、<code class="code-inline">show</code>。</div>
+    <div class="next-wrap"><button class="btn-primary" onclick="exploreNext()">继续 →</button></div>`:''}`;
+}
+function checkFills() {
+  const v1=document.getElementById('fill-1').value.trim(),v2=document.getElementById('fill-2').value.trim(),v3=document.getElementById('fill-3').value.trim().replace('()','');
+  let errs=[];
+  if(v1!=='plt') errs.push('第1空：pyplot 通常简写为 <code class="code-inline">plt</code>');
+  if(v2!=='bar') errs.push('第2空：柱状图用 <code class="code-inline">bar</code>');
+  if(v3!=='show') errs.push('第3空：显示图表用 <code class="code-inline">show</code>');
+  if(errs.length===0) {
+    state.explore.answered[6]=true; render();
+    setTimeout(()=>{
+      const ctx=document.getElementById('chart-e6'); if(!ctx) return;
+      chartInstances.e6=new Chart(ctx,{type:'bar',data:{labels:['🍎苹果','🍌香蕉','🍊橘子','🍇葡萄'],datasets:[{data:[120,85,150,60],backgroundColor:['#ff6b6b','#feca57','#ff9f43','#a29bfe'],borderRadius:6}]},options:{plugins:{legend:{display:false},title:{display:true,text:'水果销量',color:'#e2e2e2',font:{size:16}}},scales:{y:{ticks:{color:'#8a8a9a'},grid:{color:'#1e2230'}},x:{ticks:{color:'#8a8a9a'},grid:{display:false}}}}});
+    },100);
+  } else {
+    document.getElementById('fill-result').innerHTML=`<div class="feedback wrong" style="margin-top:16px">${errs.join('<br>')}</div>`;
+    ['fill-1','fill-2','fill-3'].forEach((id,i)=>{if(errs.some(e=>e.includes('第'+(i+1))))document.getElementById(id).classList.add('wrong');});
+  }
+}
+
+// E7: Summary
+function renderE7() {
+  fireConfetti();
+  return `<div class="summary-card"><div class="emoji">🎉</div><h2>你学会了用 matplotlib 画图！</h2>
+    <p class="page-desc">核心就 3 步：</p>
+    <div class="steps"><span style="color:var(--success)">1.</span> 准备数据（两个列表）<br><span style="color:var(--success)">2.</span> 选图类型（<code class="code-inline">plot</code> = 折线 / <code class="code-inline">bar</code> = 柱状）<br><span style="color:var(--success)">3.</span> 加标签（<code class="code-inline">xlabel</code>、<code class="code-inline">ylabel</code>、<code class="code-inline">title</code>）</div>
+    <div class="xp-badge">⭐ +25 经验值</div>
+    <div style="margin-top:24px"><button class="btn-primary" onclick="switchSection('drill')">开始练习 ⚡</button></div></div>`;
+}
+
+// ==================== DRILLS ====================
+const drills = [
+  {type:'predict',question:'这段代码画出来的线是什么形状？',code:'plt.plot([10, 20, 10, 20])',options:['锯齿形（上下上下）','一条直线向上','一条直线向下','一个V字形'],correct:0},
+  {type:'match',question:'把函数和它的作用配对（先点左边，再点右边）：',left:['plt.xlabel()','plt.title()','plt.show()'],right:['显示图表','横轴标签','图表标题'],correctMap:[1,2,0]},
+  {type:'choice',question:'画柱状图用哪个函数？',options:['plt.plot()','plt.bar()'],correct:1},
+  {type:'fill',question:'导入 matplotlib 的标准写法：',before:'import matplotlib.pyplot as ',answer:'plt',placeholder:'___'},
+  {type:'order',question:'把这 4 行代码排成正确顺序（拖拽）：',items:['plt.show()','plt.plot(x, y)','import matplotlib.pyplot as plt','plt.title(\'成绩趋势\')'],correct:[2,1,3,0]},
+  {type:'predict',question:'这段代码会报错，为什么？',code:'plt.bar([\'A\',\'B\',\'C\'], [10, 20])',options:['x 有 3 个值但 y 只有 2 个','bar 不能用字符串做 x 轴','缺少 plt.show()'],correct:0},
+  {type:'choice',question:'5 个城市的人口对比，应该用什么图？',options:['折线图 (plot)','柱状图 (bar)'],correct:1,explanation:'柱状图适合比较不同类别；折线图适合看随时间变化的趋势。'},
+  {type:'fill',question:'给纵轴加标签"分数"：',before:'plt.',after:'(\'分数\')',answer:'ylabel',placeholder:'______'},
+  {type:'choice',question:'你的体重从 1 月到 12 月的变化，应该用？',options:['折线图 (plot)','柱状图 (bar)'],correct:0,explanation:'随时间变化的趋势 → 折线图。'},
+  {type:'predict',question:'plt.plot([1,2,3,4], [1,4,9,16]) 画出来的线？',code:'plt.plot([1,2,3,4], [1,4,9,16])',options:['一条直线','向上弯曲的曲线','向下弯曲的曲线','锯齿形'],correct:1}
+];
+
+function renderDrill(el) {
+  const d=state.drill, total=drills.length;
+  if(d.index>=total) {
+    fireConfetti();
+    el.innerHTML=`<div style="padding-top:40px"><div class="page-card summary-card"><div class="emoji">⚡</div><h2>练习完成！</h2><p class="page-desc">答对 ${d.score}/${total} 题</p><div class="xp-badge">⭐ +${d.score*5} 经验值</div><div style="margin-top:24px"><button class="btn-primary" onclick="switchSection('project')">进入项目实战 🚀</button></div></div></div>`;
+    return;
+  }
+  const drill=drills[d.index], ans=d.answered[d.index], pct=(d.index/total*100).toFixed(0);
+  let html=`<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+    <div class="drill-header"><div class="drill-count">第 ${d.index+1}/${total} 题</div>
+    <div class="drill-score"><span style="color:var(--danger)">${'❤️'.repeat(d.hearts)}${'🖤'.repeat(3-d.hearts)}</span><span>⭐ ${d.score*5}</span></div></div>
+    <div class="page-card"><h2 class="page-title">${drill.question}</h2>`;
+  if(drill.code) html+=`<div class="code-block">${drill.code}</div>`;
+
+  switch(drill.type) {
+    case 'predict': case 'choice':
+      html+=`<div class="options">`;
+      drill.options.forEach((opt,i)=>{
+        let cls=''; if(ans!==undefined){if(i===drill.correct)cls='correct';else if(i===ans)cls='wrong';}
+        html+=`<button class="opt-btn ${cls}" onclick="answerDrill(${i})" ${ans!==undefined?'disabled':''}><span class="opt-letter">${String.fromCharCode(65+i)}</span> ${opt}</button>`;
+      });
+      html+=`</div>`;
+      if(ans!==undefined) html+=ans===drill.correct?`<div class="feedback correct">✅ 正确！${drill.explanation||''}</div>`:`<div class="feedback wrong">❌ 正确答案是 ${String.fromCharCode(65+drill.correct)}：${drill.options[drill.correct]}${drill.explanation?'。'+drill.explanation:''}</div>`;
+      break;
+    case 'fill':
+      html+=`<div class="input-line" style="font-size:16px"><span style="color:#abb2bf">${drill.before||''}</span>
+        <input id="drill-fill" type="text" placeholder="${drill.placeholder}" style="width:120px;font-size:16px" ${ans!==undefined?`disabled value="${drill.answer}"`:''}  class="${ans===true?'correct':(ans===false?'wrong':'')}" onkeyup="if(event.key==='Enter')submitDrillFill()">
+        <span style="color:#abb2bf">${drill.after||''}</span>
+        ${ans===undefined?'<button class="btn-primary" style="margin:0;padding:8px 20px" onclick="submitDrillFill()">确认</button>':''}</div>`;
+      if(ans===true) html+=`<div class="feedback correct">✅ 正确！</div>`;
+      if(ans===false) html+=`<div class="feedback wrong">❌ 正确答案是 <code class="code-inline">${drill.answer}</code></div>`;
+      break;
+    case 'order':
+      if(ans===undefined) {
+        const order=state.drill.currentOrder||drill.items.map((_,i)=>i);
+        html+=`<div class="order-list" id="order-list">`;
+        order.forEach((idx,pos)=>{ html+=`<div class="order-item" draggable="true" data-idx="${idx}" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dropItem(event)"><span class="order-num">${pos+1}</span><code>${drill.items[idx]}</code></div>`; });
+        html+=`</div><button class="btn-primary" onclick="submitOrder()">确认顺序</button>`;
+      } else {
+        html+=`<div class="order-list">`;
+        drill.correct.forEach((idx,pos)=>{ html+=`<div class="order-item" style="border-color:var(--success)"><span class="order-num" style="background:var(--success);color:#fff">${pos+1}</span><code>${drill.items[idx]}</code></div>`; });
+        html+=`</div>`;
+        html+=ans===true?'<div class="feedback correct">✅ 顺序正确！import → 画图 → 装饰 → 显示。</div>':'<div class="feedback wrong">❌ 正确顺序如上。</div>';
+      }
+      break;
+    case 'match':
+      if(!state.drill.matchState) state.drill.matchState={selected:null,connections:{}};
+      const ms=state.drill.matchState;
+      if(ans!==undefined) {
+        html+='<div style="display:flex;flex-direction:column;gap:10px;margin-top:16px">';
+        drill.left.forEach((l,i)=>{ html+=`<div style="display:flex;align-items:center;gap:12px"><div class="match-item matched" style="flex:1">${l}</div><span style="color:var(--success)">→</span><div class="match-item matched" style="flex:1">${drill.right[drill.correctMap[i]]}</div></div>`; });
+        html+='</div>';
+        html+=ans===true?'<div class="feedback correct">✅ 全部正确！</div>':'<div class="feedback wrong">❌ 正确配对如上。</div>';
+      } else {
+        html+=`<p style="font-size:13px;color:var(--text-dim);margin-top:12px">先点左边，再点右边配对</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px"><div style="display:flex;flex-direction:column;gap:8px">`;
+        drill.left.forEach((l,i)=>{ const conn=ms.connections[i]!==undefined,sel=ms.selected===i; html+=`<div class="match-item ${sel?'selected':''} ${conn?'matched':''}" onclick="matchSelectLeft(${i})">${l}${conn?' → '+drill.right[ms.connections[i]]:''}</div>`; });
+        html+=`</div><div style="display:flex;flex-direction:column;gap:8px">`;
+        drill.right.forEach((r,i)=>{ const used=Object.values(ms.connections).includes(i); html+=`<div class="match-item ${used?'matched':''}" onclick="matchSelectRight(${i})">${r}</div>`; });
+        html+=`</div></div>`;
+        if(Object.keys(ms.connections).length===drill.left.length) html+=`<button class="btn-primary" onclick="submitMatch()">确认配对</button>`;
+      }
+      break;
+  }
+  if(ans!==undefined) html+=`<div class="next-wrap"><button class="btn-primary" onclick="nextDrill()">下一题 →</button></div>`;
+  html+=`</div>`;
+  el.innerHTML=html;
+}
+
+function answerDrill(idx){const d=state.drill;if(d.answered[d.index]!==undefined)return;d.answered[d.index]=idx;if(idx===drills[d.index].correct)d.score++;else d.hearts=Math.max(0,d.hearts-1);render();}
+function submitDrillFill(){const d=state.drill,drill=drills[d.index],v=document.getElementById('drill-fill').value.trim();const ok=v.toLowerCase()===drill.answer.toLowerCase();d.answered[d.index]=ok;if(ok)d.score++;else d.hearts=Math.max(0,d.hearts-1);render();}
+function matchSelectLeft(i){if(state.drill.answered[state.drill.index]!==undefined)return;if(!state.drill.matchState)state.drill.matchState={selected:null,connections:{}};state.drill.matchState.selected=i;render();}
+function matchSelectRight(i){if(state.drill.answered[state.drill.index]!==undefined)return;const ms=state.drill.matchState;if(ms.selected===null)return;ms.connections[ms.selected]=i;ms.selected=null;render();}
+function submitMatch(){const d=drills[state.drill.index],ms=state.drill.matchState;let ok=true;d.left.forEach((_,i)=>{if(ms.connections[i]!==d.correctMap[i])ok=false;});state.drill.answered[state.drill.index]=ok;if(ok)state.drill.score++;else state.drill.hearts=Math.max(0,state.drill.hearts-1);state.drill.matchState=null;render();}
+let draggedEl=null;
+function dragStart(e){draggedEl=e.target.closest('.order-item');e.dataTransfer.effectAllowed='move';}
+function dragOver(e){e.preventDefault();}
+function dropItem(e){e.preventDefault();const target=e.target.closest('.order-item');if(!target||!draggedEl||target===draggedEl)return;const list=document.getElementById('order-list'),items=[...list.querySelectorAll('.order-item')],from=items.indexOf(draggedEl),to=items.indexOf(target);if(!state.drill.currentOrder)state.drill.currentOrder=drills[state.drill.index].items.map((_,i)=>i);const m=state.drill.currentOrder.splice(from,1)[0];state.drill.currentOrder.splice(to,0,m);render();}
+function submitOrder(){const d=state.drill,drill=drills[d.index],order=d.currentOrder||drill.items.map((_,i)=>i),ok=JSON.stringify(order)===JSON.stringify(drill.correct);d.answered[d.index]=ok;if(ok)d.score++;else d.hearts=Math.max(0,d.hearts-1);d.currentOrder=null;render();}
+function nextDrill(){state.drill.index++;state.drill.matchState=null;render();window.scrollTo({top:0,behavior:'smooth'});}
+
+// ==================== PROJECT ====================
+const SETUP_CODE = `
+import matplotlib
+matplotlib.use('AGG')
+import matplotlib.pyplot as plt
+import numpy as np
+`;
+
+const projectSteps = [
+  {
+    title: 'Step 1/6 · 准备数据',
+    goal: '把一周的屏幕时间整理成 Python 列表，运行看看统计结果。',
+    desc: '下面是示例数据——<strong>试试把数字改成你自己的真实屏幕时间</strong>，然后点运行。',
+    starter: `days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+hours = [3.5, 2.0, 4.0, 3.0, 5.5, 7.0, 6.5]  # ← 改成你的！
+
+total = sum(hours)
+avg = total / len(hours)
+print(f'Total: {total:.1f} hours this week')
+print(f'Average: {avg:.1f} hours per day')
+print(f'Max: {max(hours):.1f}h on {days[hours.index(max(hours))]}')`,
+    mode: 'free',  // free = just run, no validation
+  },
+  {
+    title: 'Step 2/6 · 画折线图',
+    goal: '用 plt.plot() 把数据画成折线图。',
+    desc: '数据已经准备好了（days 和 hours）。<strong>你来写画图的代码</strong>。<br>需要写两行：一行画折线，一行显示图表。',
+    starter: `days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+hours = [3.5, 2.0, 4.0, 3.0, 5.5, 7.0, 6.5]
+
+# ---- 在下面写你的代码 ----
+# 提示：plt.plot(?, ?) 画折线
+#       plt.show() 显示图表
+
+`,
+    mode: 'challenge',
+    hints: [
+      '用 <code>plt.plot()</code> 来画折线，它需要两个参数：x 数据和 y 数据。',
+      'x 数据是 <code>days</code>，y 数据是 <code>hours</code>。写成：<code>plt.plot(days, hours)</code>',
+      '完整答案：<br><code>plt.plot(days, hours)</code><br><code>plt.show()</code>'
+    ],
+    check: (result) => result.plots.length > 0 && !result.error,
+  },
+  {
+    title: 'Step 3/6 · 加标题和轴标签',
+    goal: '给图加上标题、横轴标签、纵轴标签，让别人看懂。',
+    desc: '在 plot() 和 show() 之间，加 3 行代码。<strong>标题和标签内容随你写！</strong>',
+    starter: `days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+hours = [3.5, 2.0, 4.0, 3.0, 5.5, 7.0, 6.5]
+
+plt.plot(days, hours, marker='o', color='steelblue')
+
+# ---- 在下面加标题和标签 ----
+# plt.title('...')
+# plt.xlabel('...')
+# plt.ylabel('...')
+
+plt.show()`,
+    mode: 'challenge',
+    hints: [
+      '<code>plt.title()</code> 加标题，<code>plt.xlabel()</code> 加横轴标签，<code>plt.ylabel()</code> 加纵轴标签。',
+      '例如：<code>plt.title(\'My Screen Time\')</code>',
+      '完整示例：<br><code>plt.title(\'My Screen Time\')</code><br><code>plt.xlabel(\'Day\')</code><br><code>plt.ylabel(\'Hours\')</code>'
+    ],
+    check: (result) => result.plots.length > 0 && !result.error,
+  },
+  {
+    title: 'Step 4/6 · 画一条"警戒线"',
+    goal: '在图上加一条红色水平虚线，标记每日上限（比如 3 小时）。',
+    desc: '新函数：<code class="code-inline">plt.axhline(y=数值, color=颜色, linestyle=线型)</code><br><code class="code-inline">axhline</code> = <strong>ax</strong>is <strong>h</strong>orizontal <strong>line</strong>（水平参考线）<br><br><strong>在代码中加一行 axhline，画出红色虚线。</strong>',
+    starter: `days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+hours = [3.5, 2.0, 4.0, 3.0, 5.5, 7.0, 6.5]
+
+plt.plot(days, hours, marker='o', color='steelblue')
+plt.title('My Screen Time')
+plt.xlabel('Day')
+plt.ylabel('Hours')
+
+# ---- 在下面加一条红色虚线，y=3 ----
+
+
+plt.show()`,
+    mode: 'challenge',
+    hints: [
+      '<code>plt.axhline()</code> 画水平线。参数：<code>y</code> 是位置，<code>color</code> 是颜色，<code>linestyle</code> 是线型。',
+      '红色 = <code>\'red\'</code>，虚线 = <code>\'--\'</code>',
+      '完整：<code>plt.axhline(y=3, color=\'red\', linestyle=\'--\')</code>'
+    ],
+    check: (result) => result.plots.length > 0 && !result.error,
+  },
+  {
+    title: 'Step 5/6 · 彩色柱状图',
+    goal: '画柱状图，超标的日子标红色，正常的标绿色。',
+    desc: '用列表推导式根据 hours 生成颜色列表，然后用 <code class="code-inline">plt.bar()</code> 画图。<br><strong>试试自己写颜色逻辑和 bar 代码。</strong>',
+    starter: `days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+hours = [3.5, 2.0, 4.0, 3.0, 5.5, 7.0, 6.5]
+
+# ---- 第1步：生成颜色列表 ----
+# 超过3小时 → 红色，否则 → 绿色
+# 用列表推导式写一行代码，生成 colors 列表
+colors =
+
+# ---- 第2步：画柱状图 ----
+# 用 plt.bar() 画图，记得传入 color=colors
+
+
+plt.axhline(y=3, color='red', linestyle='--', alpha=0.5)
+plt.title('Screen Time by Day')
+plt.ylabel('Hours')
+plt.show()`,
+    mode: 'challenge',
+    hints: [
+      '先生成颜色列表：对 hours 里的每个值判断是否超过 3。',
+      '<code>colors = [\'red\' if h > 3 else \'green\' for h in hours]</code>',
+      '完整代码：<br><code>colors = [\'red\' if h > 3 else \'green\' for h in hours]</code><br><code>plt.bar(days, hours, color=colors)</code>'
+    ],
+    check: (result) => result.plots.length > 0 && !result.error,
+  },
+  {
+    title: 'Step 6/6 · 双图报告',
+    goal: '生成一张左右并排的报告——折线图 + 柱状图。',
+    desc: '这段代码用了 <code class="code-inline">subplots</code>（子图）——<strong>现在看不全懂没关系</strong>，后面单元会学。<br>你可以修改颜色、标题等，反复运行看效果！',
+    starter: `days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+hours = [3.5, 2.0, 4.0, 3.0, 5.5, 7.0, 6.5]
+colors = ['#ff6b6b' if h > 3 else '#00b894' for h in hours]
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
+
+# Left: line chart
+ax1.plot(days, hours, marker='o', color='steelblue', linewidth=2)
+ax1.axhline(y=3, color='red', linestyle='--', alpha=0.4)
+ax1.set_title('Trend')
+ax1.set_ylabel('Hours')
+
+# Right: bar chart
+ax2.bar(days, hours, color=colors)
+ax2.axhline(y=3, color='red', linestyle='--', alpha=0.4)
+ax2.set_title('Daily Comparison')
+
+fig.suptitle('My Weekly Screen Time Report', fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+print('Report generated! Try changing the data or colors.')`,
+    mode: 'free',
+  }
+];
+
+function renderProject(el) {
+  const p = state.project;
+
+  // Not started yet
+  if (p.step === -1) {
+    el.innerHTML = `<div style="padding-top:40px"><div class="page-card" style="text-align:center;padding:48px 32px">
+      <div style="font-size:56px;margin-bottom:16px">📱</div>
+      <h2 style="font-size:24px;margin-bottom:8px">我的一周屏幕时间报告</h2>
+      <p class="page-desc">用 Python 分析你的屏幕使用数据，生成一份图表报告。<br>这次你需要<strong>自己写代码</strong>——有提示帮你，可以反复运行。</p>
+      <div style="display:flex;gap:20px;justify-content:center;margin-top:16px;font-size:13px;color:var(--text-dim)">
+        <span>⏱ 约 15-20 分钟</span><span>📝 6 步</span><span>🎯 产出：图表报告</span>
+      </div>
+      ${!pyodideReady ? '<div class="loading-box" style="padding:20px"><div class="spinner"></div><p>Python 环境加载中，请稍候...</p></div>' :
+        '<button class="btn-primary" onclick="startProject()" style="margin-top:32px;font-size:16px;padding:14px 36px">开始项目 →</button>'}
+    </div></div>`;
+    return;
+  }
+
+  // Completed
+  if (p.step >= projectSteps.length) {
+    fireConfetti();
+    el.innerHTML = `<div style="padding-top:40px"><div class="page-card summary-card">
+      <div class="emoji">🏆</div><h2>项目完成！</h2>
+      <p class="page-desc" style="margin-bottom:20px">你用 Python 独立完成了一份数据分析报告！</p>
+      <div class="steps" style="text-align:left">✅ 整理了一周的屏幕时间数据<br>✅ 用折线图看趋势<br>✅ 加了标题和轴标签<br>✅ 画了红色警戒线<br>✅ 用彩色柱状图对比超标日<br>✅ 生成了双图并排报告</div>
+      <div class="xp-badge" style="margin-top:20px">🏆 +80 经验值 · 成就：数据分析师 Lv.1</div>
+    </div></div>`;
+    return;
+  }
+
+  const step = projectSteps[p.step];
+  const output = p.outputs[p.step];
+  const hintLvl = p.hintLevel[p.step] || 0;
+
+  // Step dots
+  let html = `<div class="project-steps">`;
+  for (let i = 0; i < projectSteps.length; i++) {
+    html += `<div class="project-step-dot ${i < p.step ? 'done' : (i === p.step ? 'active' : '')}"></div>`;
+  }
+  html += `</div><div class="page-card">`;
+
+  html += `<h2 class="page-title">${step.title}</h2>`;
+  html += `<div class="goal-box"><h3>🎯 目标</h3><p>${step.goal}</p></div>`;
+  html += `<p class="page-desc">${step.desc}</p>`;
+
+  // Code editor
+  const codeId = `project-code-${p.step}`;
+  const savedCode = p[`code_${p.step}`] || step.starter;
+  html += `<div class="code-editor">
+    <div class="code-editor-header"><span>Python</span><span style="font-size:11px;color:var(--text-dim)">可以自由编辑代码</span></div>
+    <textarea id="${codeId}" spellcheck="false" oninput="saveProjectCode(${p.step})">${escHtml(savedCode)}</textarea>
+  </div>`;
+
+  // Buttons
+  html += `<div class="editor-buttons">`;
+  html += `<button class="btn-primary btn-run" onclick="runProjectCode(${p.step})" id="run-btn">▶ 运行</button>`;
+  html += `<button class="btn-primary btn-reset" onclick="resetProjectCode(${p.step})">↩ 重置代码</button>`;
+
+  // Hint buttons (for challenge mode)
+  if (step.mode === 'challenge' && step.hints) {
+    for (let i = 0; i < step.hints.length; i++) {
+      if (i <= hintLvl - 1) continue; // already shown
+      html += `<button class="btn-primary btn-hint" onclick="showHint(${p.step},${i})">💡 提示 ${i + 1}</button>`;
+      break; // only show next hint button
+    }
+  }
+  html += `</div>`;
+
+  // Shown hints
+  for (let i = 0; i < hintLvl; i++) {
+    if (step.hints && step.hints[i]) {
+      html += `<div class="hint-box">💡 提示 ${i + 1}：${step.hints[i]}</div>`;
+    }
+  }
+
+  // Output
+  if (output) {
+    if (output.error) {
+      html += `<div class="output-area"><div class="output-header">❌ 错误</div><div class="output-body"><pre class="output-error">${escHtml(output.error)}</pre></div></div>`;
+      html += `<div class="feedback wrong" style="margin-top:12px">${friendlyError(output.error, step)}</div>`;
+    } else {
+      if (output.stdout) {
+        html += `<div class="output-area"><div class="output-header">📝 文字输出</div><div class="output-body"><pre class="output-text">${escHtml(output.stdout)}</pre></div></div>`;
+      }
+      if (output.plots && output.plots.length > 0) {
+        html += `<div class="output-area"><div class="output-header">📊 图表输出</div><div class="output-body">`;
+        output.plots.forEach(p => { html += `<img src="data:image/png;base64,${p}" class="output-img">`; });
+        html += `</div></div>`;
+      }
+
+      // Check if step is "done"
+      const passed = step.mode === 'free' || (step.check && step.check(output));
+      if (passed) {
+        html += `<div class="step-done-banner">✅ Step ${state.project.step + 1} 完成！${step.mode === 'challenge' ? '代码运行成功。试试改改参数再运行？或者继续下一步。' : '试试修改数据再运行，或者继续下一步。'}</div>`;
+        html += `<div class="next-wrap"><button class="btn-primary" onclick="nextProjectStep()">${state.project.step < projectSteps.length - 1 ? '下一步 →' : '完成项目 🎉'}</button></div>`;
+      } else if (!output.error) {
+        html += `<div class="feedback info" style="margin-top:12px">${noPlotHint(p.step)}</div>`;
+      }
+    }
+  }
+
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+function startProject() {
+  if (!pyodideReady) return;
+  state.project.step = 0;
+  render();
+}
+
+function saveProjectCode(step) {
+  const ta = document.getElementById(`project-code-${step}`);
+  if (ta) state.project[`code_${step}`] = ta.value;
+}
+
+function resetProjectCode(step) {
+  state.project[`code_${step}`] = projectSteps[step].starter;
+  state.project.outputs[step] = null;
+  render();
+}
+
+function showHint(step, level) {
+  state.project.hintLevel[step] = level + 1;
+  render();
+}
+
+async function runProjectCode(step) {
+  const ta = document.getElementById(`project-code-${step}`);
+  if (!ta) return;
+  const code = ta.value;
+  state.project[`code_${step}`] = code;
+
+  // Show running state
+  const btn = document.getElementById('run-btn');
+  if (btn) { btn.textContent = '⏳ 运行中...'; btn.disabled = true; }
+
+  try {
+    const result = await executePython(SETUP_CODE + '\n' + code);
+    state.project.outputs[step] = result;
+  } catch(e) {
+    state.project.outputs[step] = { error: e.message, stdout: '', plots: [] };
+  }
+
+  render();
+}
+
+function nextProjectStep() {
+  state.project.step++;
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ==================== UTILS ====================
+function friendlyError(err, step) {
+  const e = err.toLowerCase();
+  let msg = '';
+
+  // NameError: variable not defined (e.g. color=blue without quotes)
+  if (e.includes('nameerror')) {
+    const match = err.match(/name '(\w+)' is not defined/);
+    if (match) {
+      const name = match[1];
+      // Common case: forgot quotes around a string like color=red
+      if (['red','blue','green','black','white','orange','yellow','steelblue'].includes(name)) {
+        msg = `Python 不认识 <code>${name}</code>——你是不是忘了加引号？颜色名是字符串，要写成 <code>'${name}'</code>（带引号）。`;
+      } else if (name === 'colors') {
+        msg = `变量 <code>colors</code> 还没有定义。你需要先写一行代码创建它，再使用它。`;
+      } else {
+        msg = `Python 不认识 <code>${name}</code>。检查一下：是不是拼写错了？或者忘了加引号（字符串需要引号）？`;
+      }
+    }
+  }
+  // SyntaxError
+  else if (e.includes('syntaxerror')) {
+    if (e.includes('invalid syntax')) {
+      msg = `代码格式有误。常见原因：<br>· 漏了引号、括号、逗号<br>· <code>linestyle</code> 的值 <code>'--'</code> 需要引号括起来`;
+    } else if (e.includes('eol while scanning') || e.includes('unterminated string')) {
+      msg = `字符串没有正确关闭——检查一下是不是少了一个引号 <code>'</code>。`;
+    } else {
+      msg = `代码格式有误，检查一下括号、引号、逗号是否配对。`;
+    }
+  }
+  // TypeError: wrong arguments
+  else if (e.includes('typeerror')) {
+    if (e.includes('argument')) {
+      msg = `函数参数不对。检查一下括号里的内容：参数个数对吗？参数名拼对了吗？`;
+    } else {
+      msg = `数据类型不对。比如：是不是把字符串和数字搞混了？`;
+    }
+  }
+  // IndentationError
+  else if (e.includes('indentationerror')) {
+    msg = `缩进有问题——Python 对空格很敏感。检查一下代码前面的空格是否一致。`;
+  }
+
+  if (!msg) {
+    msg = `代码出错了，看看上面的错误信息，试着理解 Python 在说什么。`;
+  }
+
+  if (step.mode === 'challenge') {
+    msg += `<br><span style="color:var(--text-dim);font-size:13px">需要帮助？点下面的"💡 提示"按钮。</span>`;
+  }
+  return msg;
+}
+
+function noPlotHint(stepIdx) {
+  const hints = {
+    1: '代码运行了但没有产生图表。你需要写 <code>plt.plot(days, hours)</code> 画图，再写 <code>plt.show()</code> 显示。',
+    2: '代码运行了但图表不完整。检查一下是不是没有写 <code>plt.title()</code>、<code>plt.xlabel()</code>、<code>plt.ylabel()</code>？',
+    3: '代码运行了但没有看到警戒线。你需要加一行 <code>plt.axhline(...)</code>。',
+    4: '代码运行了但没有柱状图。你需要先定义 <code>colors</code> 列表，再写 <code>plt.bar(days, hours, color=colors)</code>。',
+  };
+  return hints[stepIdx] || '代码运行了但没有产生图表。检查一下画图的代码是否正确。';
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fireConfetti() {
+  const o = document.createElement('div'); o.className = 'confetti-overlay'; document.body.appendChild(o);
+  const colors = ['#6c5ce7','#a29bfe','#00b894','#feca57','#ff6b6b','#fd79a8','#74b9ff'];
+  for (let i = 0; i < 60; i++) {
+    const p = document.createElement('div'); p.className = 'confetti-piece';
+    p.style.left = Math.random()*100+'vw'; p.style.backgroundColor = colors[Math.floor(Math.random()*colors.length)];
+    p.style.animationDelay = Math.random()*.5+'s'; p.style.animationDuration = (2+Math.random()*1.5)+'s';
+    p.style.width = (6+Math.random()*8)+'px'; p.style.height = (6+Math.random()*8)+'px'; o.appendChild(p);
+  }
+  setTimeout(() => o.remove(), 3500);
+}
+
+// ==================== INIT ====================
+render();
+initPyodide();
+</script>
+</body>
+</html>
