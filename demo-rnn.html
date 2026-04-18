@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RNN · 循环神经网络</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap');
+:root {
+  --bg: #0a0c14; --bg2: #0f1220; --card: #151928; --card-border: #1e2540;
+  --primary: #0080ff; --primary-soft: #0080ff22; --primary-glow: #0080ff40;
+  --accent: #00e5a0; --accent-soft: #00e5a018;
+  --warm: #ff8c42; --warm-soft: #ff8c4220;
+  --danger: #ff5574;
+  --text: #cdd4e0; --text-dim: #5a6484; --text-bright: #f0f4ff;
+  --mono: 'JetBrains Mono', monospace; --sans: 'Noto Sans SC', sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+
+.progress-track{position:fixed;top:0;left:0;right:0;height:3px;background:var(--bg2);z-index:100}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));transition:width .6s cubic-bezier(.22,1,.36,1);box-shadow:0 0 20px var(--primary-glow)}
+.step-dots{position:fixed;top:16px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:101}
+.step-dot{width:8px;height:8px;border-radius:50%;background:var(--card-border);transition:all .4s}
+.step-dot.active{background:var(--primary);box-shadow:0 0 10px var(--primary-glow)}
+.step-dot.done{background:var(--accent)}
+
+.container{max-width:720px;margin:0 auto;padding:60px 24px 120px}
+.page{display:none;animation:pageIn .5s cubic-bezier(.22,1,.36,1)}.page.active{display:block}
+@keyframes pageIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+
+.page-number{font-family:var(--mono);font-size:13px;color:var(--primary);letter-spacing:2px;margin-bottom:12px;font-weight:600}
+.page-title{font-size:28px;font-weight:900;color:var(--text-bright);line-height:1.4;margin-bottom:20px;letter-spacing:-.5px}
+.page-desc{font-size:16px;line-height:1.9;color:var(--text);margin-bottom:28px;font-weight:300}
+.page-desc strong{color:var(--text-bright);font-weight:500}
+.hl-blue{color:var(--primary);font-weight:500}
+.hl-green{color:var(--accent);font-weight:500}
+.hl-warm{color:var(--warm);font-weight:500}
+
+.btn{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;border:none;border-radius:10px;font-family:var(--sans);font-size:15px;font-weight:600;cursor:pointer;transition:all .3s;letter-spacing:.5px}
+.btn-primary{background:var(--primary);color:#fff;box-shadow:0 4px 20px var(--primary-glow)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 30px var(--primary-glow)}
+.btn-primary:disabled{opacity:.3;cursor:not-allowed;transform:none}
+.btn-secondary{background:var(--card);color:var(--text);border:1px solid var(--card-border)}
+.btn-secondary:hover{background:#1e2540;border-color:var(--primary)}
+.btn-accent{background:var(--accent);color:#0a0c14}.btn-accent:hover{transform:translateY(-2px)}
+.btn-row{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap}
+
+/* ── RNN specific ── */
+.sequence-display{display:flex;gap:6px;justify-content:center;margin:20px 0;flex-wrap:wrap}
+.seq-token{padding:12px 18px;border-radius:10px;font-size:18px;font-weight:700;border:2px solid var(--card-border);background:var(--card);transition:all .4s;min-width:48px;text-align:center}
+.seq-token.active{border-color:var(--warm);background:var(--warm-soft);color:var(--warm);box-shadow:0 0 15px #ff8c4230;transform:scale(1.1)}
+.seq-token.done{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.seq-token.future{opacity:.35}
+
+.rnn-flow{display:flex;align-items:center;justify-content:center;gap:0;margin:28px 0;overflow-x:auto;padding:20px 0}
+.rnn-cell{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:90px}
+.rnn-box{width:72px;height:72px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:14px;font-weight:600;transition:all .5s;border:2px solid var(--card-border);background:var(--card);color:var(--text-dim)}
+.rnn-box.active{border-color:var(--primary);background:var(--primary-soft);color:var(--primary);box-shadow:0 0 20px var(--primary-glow)}
+.rnn-box.done{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.rnn-input-label{font-size:12px;color:var(--text-dim);font-weight:500}
+.rnn-input-val{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--warm)}
+.rnn-h-label{font-size:11px;color:var(--text-dim)}
+.rnn-h-val{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--accent)}
+.rnn-arrow{font-size:20px;color:var(--primary);transition:all .4s;opacity:.3;margin:0 2px}
+.rnn-arrow.active{opacity:1;color:var(--accent)}
+
+.hidden-state-bar{background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:16px 24px;margin:16px 0;display:flex;align-items:center;gap:16px;justify-content:center}
+.hs-label{font-size:13px;color:var(--text-dim)}
+.hs-value{font-family:var(--mono);font-size:28px;font-weight:900;color:var(--accent);min-width:60px;text-align:center;transition:all .3s}
+.hs-value.changing{animation:flash .4s ease}
+@keyframes flash{0%,100%{opacity:1}50%{opacity:.3;transform:scale(1.2)}}
+
+.formula-box{background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:20px;margin:20px 0;font-family:var(--mono);font-size:15px;line-height:2.2;color:var(--text);text-align:center}
+.f-h{color:var(--accent);font-weight:700}
+.f-x{color:var(--warm);font-weight:700}
+.f-w{color:var(--primary);font-weight:600}
+
+.comparison-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:24px 0}
+.comp-card{background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:20px;text-align:center}
+.comp-card-title{font-size:14px;font-weight:700;margin-bottom:10px}
+.comp-card-icon{font-size:40px;margin-bottom:10px}
+.comp-card-desc{font-size:13px;color:var(--text-dim);line-height:1.7}
+
+.answer-input{width:80px;height:48px;text-align:center;font-family:var(--mono);font-size:18px;font-weight:600;background:var(--bg);border:2px solid var(--card-border);border-radius:8px;color:var(--text-bright);outline:none;transition:border-color .3s}
+.answer-input:focus{border-color:var(--primary);box-shadow:0 0 12px var(--primary-glow)}
+.answer-input.correct{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.answer-input.wrong{border-color:var(--danger);background:#ff557418;color:var(--danger);animation:shake .4s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+
+.feedback{padding:14px 20px;border-radius:10px;font-size:14px;margin-top:16px;display:none;font-weight:500;animation:pageIn .3s}
+.feedback.show{display:block}
+.feedback.correct{background:var(--accent-soft);border:1px solid #00e5a040;color:var(--accent)}
+.feedback.wrong{background:#ff557418;border:1px solid #ff557440;color:var(--danger)}
+
+.tag-list{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0}
+.tag{padding:8px 18px;background:var(--primary-soft);border:1px solid #0080ff30;border-radius:20px;font-size:14px;color:var(--primary);font-weight:500}
+
+.flashcard{background:var(--card);border:1px solid var(--card-border);border-radius:14px;padding:28px;margin:16px 0}
+.flashcard-q{font-size:16px;color:var(--text-bright);margin-bottom:16px;font-weight:500}
+.flashcard-options{display:flex;flex-direction:column;gap:8px}
+.flashcard-opt{padding:12px 16px;background:var(--bg2);border:1px solid var(--card-border);border-radius:8px;color:var(--text);cursor:pointer;font-size:14px;transition:all .2s;text-align:left}
+.flashcard-opt:hover{border-color:var(--primary);background:var(--primary-soft)}
+.flashcard-opt.fc-correct{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.flashcard-opt.fc-wrong{border-color:var(--danger);background:#ff557418;color:var(--danger)}
+.flashcard-opt.fc-disabled{pointer-events:none;opacity:.5}
+
+.score-display{text-align:center;padding:30px;margin:20px 0}
+.score-number{font-family:var(--mono);font-size:64px;font-weight:900;background:linear-gradient(135deg,var(--primary),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.score-label{font-size:14px;color:var(--text-dim);margin-top:4px}
+
+@media(max-width:600px){
+  .container{padding:50px 16px 100px}.page-title{font-size:22px}
+  .comparison-grid{grid-template-columns:1fr}.rnn-box{width:56px;height:56px;font-size:12px}
+}
+</style>
+</head>
+<body>
+<div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+<div class="step-dots" id="stepDots"></div>
+
+<div class="container">
+
+<!-- ════════ PAGE 1 ════════ -->
+<div class="page active" id="page1">
+  <div class="page-number">01 / 07</div>
+  <div class="page-title">有些数据，<br>顺序很重要</div>
+  <div class="page-desc">
+    看这两句话：<br><br>
+    <strong>"猫 追 狗"</strong> 和 <strong>"狗 追 猫"</strong><br><br>
+    完全相同的三个字，换个顺序，意思就反了。<br>
+    文字、语音、股票走势……这类数据叫<span class="hl-blue">序列（Sequence）</span>。<br>
+    <strong>顺序本身就是信息。</strong>
+  </div>
+  <div class="comparison-grid">
+    <div class="comp-card">
+      <div class="comp-card-icon">🖼️</div>
+      <div class="comp-card-title" style="color:var(--primary)">图像</div>
+      <div class="comp-card-desc">像素之间的空间关系<br>→ 用 <strong>CNN</strong></div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-card-icon">📝</div>
+      <div class="comp-card-title" style="color:var(--warm)">序列</div>
+      <div class="comp-card-desc">元素之间的先后关系<br>→ 用 <strong>RNN</strong></div>
+    </div>
+  </div>
+  <div class="btn-row" style="justify-content:flex-end">
+    <button class="btn btn-primary" onclick="goPage(2)">继续 →</button>
+  </div>
+</div>
+
+<!-- ════════ PAGE 2 ════════ -->
+<div class="page" id="page2">
+  <div class="page-number">02 / 07</div>
+  <div class="page-title">RNN 的核心思想：<br>记忆</div>
+  <div class="page-desc">
+    普通神经网络一次看一个输入，看完就忘。<br><br>
+    RNN 不一样——它有一个<span class="hl-green">隐藏状态（Hidden State）</span>，<br>
+    像一个<strong>随身携带的笔记本</strong>。<br><br>
+    每读一个新输入，它都会：<br>
+    1. 看看笔记本上之前记了什么<br>
+    2. 结合当前输入，更新笔记本<br>
+    3. 带着新笔记继续往下读
+  </div>
+  <div class="formula-box">
+    <span class="f-h">h_new</span> = f( <span class="f-w">W_h</span> × <span class="f-h">h_old</span> + <span class="f-w">W_x</span> × <span class="f-x">x</span> )<br>
+    <span style="font-size:12px;color:var(--text-dim)">新状态 = 激活函数( 旧状态的权重 + 当前输入的权重 )</span>
+  </div>
+  <div class="btn-row" style="justify-content:flex-end">
+    <button class="btn btn-secondary" onclick="goPage(1)">← 返回</button>
+    <button class="btn btn-primary" onclick="goPage(3)">继续 →</button>
+  </div>
+</div>
+
+<!-- ════════ PAGE 3 ════════ -->
+<div class="page" id="page3">
+  <div class="page-number">03 / 07</div>
+  <div class="page-title">看它工作一次</div>
+  <div class="page-desc">
+    假设我们要让 RNN 读一个数字序列：<span class="hl-warm">[3, 1, 4, 1, 5]</span><br>
+    用一个极简的 RNN：<span class="hl-blue">h_new = h_old + x</span>（直接累加，方便手算）<br><br>
+    初始隐藏状态 h₀ = 0。点击按钮，看每一步怎么变化。
+  </div>
+  <div class="sequence-display" id="seq3"></div>
+  <div class="hidden-state-bar">
+    <span class="hs-label">隐藏状态 h =</span>
+    <span class="hs-value" id="hVal3">0</span>
+    <span class="hs-label" id="hExplain3" style="font-size:12px;color:var(--text-dim)">（初始值）</span>
+  </div>
+  <div class="rnn-flow" id="rnnFlow3"></div>
+  <div class="btn-row" style="justify-content:center">
+    <button class="btn btn-accent" id="stepBtn3" onclick="stepRNN3()">读取下一个 →</button>
+  </div>
+  <div id="page3done" style="display:none" class="btn-row">
+    <div style="flex:1"></div>
+    <button class="btn btn-primary" onclick="goPage(4)">继续 →</button>
+  </div>
+</div>
+
+<!-- ════════ PAGE 4 ════════ -->
+<div class="page" id="page4">
+  <div class="page-number">04 / 07</div>
+  <div class="page-title">稍微真实一点</div>
+  <div class="page-desc">
+    真正的 RNN 不是简单累加，而是带<strong>权重</strong>和<strong>激活函数</strong>的：<br><br>
+    <span class="hl-green">h_new</span> = tanh( <span class="hl-blue">W_h</span> × <span class="hl-green">h_old</span> + <span class="hl-blue">W_x</span> × <span class="hl-warm">x</span> )<br><br>
+    假设 W_h = 0.5，W_x = 0.8，序列 = <span class="hl-warm">[2, 3, 1]</span>，h₀ = 0。<br>
+    为了简化，我们用 <strong>round</strong>（四舍五入到一位小数）代替 tanh。<br><br>
+    点击按钮，看每一步计算过程。
+  </div>
+  <div class="sequence-display" id="seq4"></div>
+  <div class="hidden-state-bar">
+    <span class="hs-label">h =</span>
+    <span class="hs-value" id="hVal4">0</span>
+    <span class="hs-label" id="hCalc4" style="font-family:var(--mono);font-size:13px;color:var(--text-dim)"></span>
+  </div>
+  <div class="btn-row" style="justify-content:center">
+    <button class="btn btn-accent" id="stepBtn4" onclick="stepRNN4()">下一步 →</button>
+  </div>
+  <div id="page4done" style="display:none" class="btn-row">
+    <div style="flex:1"></div>
+    <button class="btn btn-primary" onclick="goPage(5)">继续 →</button>
+  </div>
+</div>
+
+<!-- ════════ PAGE 5 ════════ -->
+<div class="page" id="page5">
+  <div class="page-number">05 / 07</div>
+  <div class="page-title">动手算一算</div>
+  <div class="page-desc">
+    同样的规则：<span class="hl-green">h_new</span> = <span class="hl-blue">0.5</span> × <span class="hl-green">h_old</span> + <span class="hl-blue">0.8</span> × <span class="hl-warm">x</span>（不取 tanh，直接算）<br><br>
+    序列 = <span class="hl-warm">[1, 2]</span>，h₀ = 0<br><br>
+    请算出读完第 <strong>2</strong> 个数字后的隐藏状态 h₂：
+  </div>
+  <div class="formula-box">
+    h₁ = 0.5 × 0 + 0.8 × 1 = <span class="hl-green">0.8</span><br>
+    h₂ = 0.5 × 0.8 + 0.8 × 2 = <span style="color:var(--warm)">?</span>
+  </div>
+  <div style="text-align:center;margin:20px 0">
+    <span style="color:var(--text-dim);font-size:14px;margin-right:12px">h₂ =</span>
+    <input type="number" step="0.1" class="answer-input" id="answer5" onkeydown="if(event.key==='Enter')check5()">
+    <button class="btn btn-accent" style="margin-left:12px;padding:12px 24px" onclick="check5()">确认</button>
+  </div>
+  <div class="feedback" id="fb5"></div>
+  <div id="page5done" style="display:none" class="btn-row">
+    <div style="flex:1"></div>
+    <button class="btn btn-primary" onclick="goPage(6)">继续 →</button>
+  </div>
+</div>
+
+<!-- ════════ PAGE 6 ════════ -->
+<div class="page" id="page6">
+  <div class="page-number">06 / 07</div>
+  <div class="page-title">RNN 的局限</div>
+  <div class="page-desc">
+    RNN 有一个大问题——<span class="hl-warm">记忆会衰减</span>。<br><br>
+    每一步，旧的隐藏状态都会乘以 W_h（通常 < 1）。<br>
+    经过很多步之后，最早的输入对当前状态的影响几乎消失了。<br><br>
+    这就是<strong>梯度消失</strong>问题。
+  </div>
+  <div class="sequence-display" id="seq6"></div>
+  <div class="page-desc" style="font-size:14px;margin-top:16px;">
+    假设 W_h = 0.5。第1个输入的信息在第 n 步时的影响力 ≈ 0.5ⁿ<br><br>
+    <span style="font-family:var(--mono)">
+      第1步后：<span class="hl-green">0.5</span>
+      第3步后：<span class="hl-warm">0.125</span>
+      第5步后：<span style="color:var(--danger)">0.031</span>
+      第10步后：<span style="color:var(--danger)">0.001</span>
+    </span><br><br>
+    10步之后，最开始的信息只剩千分之一。<br>
+    如果句子有50个词，RNN 根本<strong>记不住开头说了什么</strong>。<br><br>
+    这就是为什么需要 <span class="hl-blue">LSTM</span>——它用"门"来控制记忆，解决这个问题。
+  </div>
+  <div class="btn-row" style="justify-content:flex-end">
+    <button class="btn btn-primary" onclick="goPage(7)">继续 →</button>
+  </div>
+</div>
+
+<!-- ════════ PAGE 7 ════════ -->
+<div class="page" id="page7">
+  <div class="page-number">07 / 07</div>
+  <div class="page-title">回顾一下</div>
+  <div class="page-desc">你刚刚学会了 RNN 的核心原理。关键概念：</div>
+  <div class="tag-list">
+    <span class="tag">序列数据 Sequence</span>
+    <span class="tag">隐藏状态 Hidden State</span>
+    <span class="tag">权重共享（每一步用同样的 W）</span>
+    <span class="tag">梯度消失 Vanishing Gradient</span>
+    <span class="tag">h_new = f(W_h·h_old + W_x·x)</span>
+  </div>
+  <div class="page-desc" style="margin-top:24px">快速检验 ⚡</div>
+  <div id="flashcards7"></div>
+  <div id="finalScore" style="display:none">
+    <div class="score-display">
+      <div class="score-number" id="scoreNum"></div>
+      <div class="score-label">RNN 核心概念掌握 🎯</div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+const PAGES = 7;
+let cur = 1;
+
+function goPage(n) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page' + n).classList.add('active');
+  cur = n;
+  document.getElementById('progressFill').style.width = (cur / PAGES * 100) + '%';
+  document.querySelectorAll('.step-dot').forEach((d, i) => {
+    d.className = 'step-dot';
+    if (i + 1 === cur) d.classList.add('active');
+    else if (i + 1 < cur) d.classList.add('done');
+  });
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+// init dots
+(function() {
+  const c = document.getElementById('stepDots');
+  for (let i = 0; i < PAGES; i++) {
+    const d = document.createElement('div');
+    d.className = 'step-dot' + (i === 0 ? ' active' : '');
+    c.appendChild(d);
+  }
+})();
+
+// ═══ PAGE 3: Simple RNN ═══
+const SEQ3 = [3, 1, 4, 1, 5];
+let pos3 = -1;
+let h3 = 0;
+
+(function initPage3() {
+  const c = document.getElementById('seq3');
+  SEQ3.forEach((v, i) => {
+    const t = document.createElement('div');
+    t.className = 'seq-token future';
+    t.textContent = v;
+    t.id = `tok3_${i}`;
+    c.appendChild(t);
+  });
+
+  const flow = document.getElementById('rnnFlow3');
+  for (let i = 0; i < 5; i++) {
+    if (i > 0) {
+      const arrow = document.createElement('div');
+      arrow.className = 'rnn-arrow';
+      arrow.textContent = '→';
+      arrow.id = `arrow3_${i}`;
+      flow.appendChild(arrow);
+    }
+    const cell = document.createElement('div');
+    cell.className = 'rnn-cell';
+    cell.innerHTML = `
+      <div class="rnn-input-label">x${i+1}</div>
+      <div class="rnn-box" id="rbox3_${i}">RNN</div>
+      <div class="rnn-h-label">h${i+1}</div>
+      <div class="rnn-h-val" id="rh3_${i}">?</div>
+    `;
+    flow.appendChild(cell);
+  }
+})();
+
+function stepRNN3() {
+  pos3++;
+  if (pos3 >= 5) {
+    document.getElementById('stepBtn3').disabled = true;
+    document.getElementById('page3done').style.display = 'flex';
+    return;
+  }
+  // update token
+  if (pos3 > 0) document.getElementById(`tok3_${pos3-1}`).className = 'seq-token done';
+  document.getElementById(`tok3_${pos3}`).className = 'seq-token active';
+
+  // compute
+  const x = SEQ3[pos3];
+  const hOld = h3;
+  h3 = hOld + x;
+
+  // update display
+  const hv = document.getElementById('hVal3');
+  hv.textContent = h3;
+  hv.classList.add('changing');
+  setTimeout(() => hv.classList.remove('changing'), 400);
+  document.getElementById('hExplain3').textContent = `（${hOld} + ${x} = ${h3}）`;
+
+  // update flow
+  document.getElementById(`rbox3_${pos3}`).className = 'rnn-box active';
+  document.getElementById(`rh3_${pos3}`).textContent = h3;
+  if (pos3 > 0) {
+    document.getElementById(`rbox3_${pos3-1}`).className = 'rnn-box done';
+    document.getElementById(`arrow3_${pos3}`).className = 'rnn-arrow active';
+  }
+
+  if (pos3 >= 4) {
+    document.getElementById(`tok3_${pos3}`).className = 'seq-token done';
+    document.getElementById(`rbox3_${pos3}`).className = 'rnn-box done';
+    document.getElementById('stepBtn3').disabled = true;
+    document.getElementById('page3done').style.display = 'flex';
+  }
+}
+
+// ═══ PAGE 4: Weighted RNN ═══
+const SEQ4 = [2, 3, 1];
+const Wh4 = 0.5, Wx4 = 0.8;
+let pos4 = -1, h4 = 0;
+
+(function initPage4() {
+  const c = document.getElementById('seq4');
+  SEQ4.forEach((v, i) => {
+    const t = document.createElement('div');
+    t.className = 'seq-token future';
+    t.textContent = v;
+    t.id = `tok4_${i}`;
+    c.appendChild(t);
+  });
+})();
+
+function stepRNN4() {
+  pos4++;
+  if (pos4 >= 3) {
+    document.getElementById('stepBtn4').disabled = true;
+    document.getElementById('page4done').style.display = 'flex';
+    return;
+  }
+  if (pos4 > 0) document.getElementById(`tok4_${pos4-1}`).className = 'seq-token done';
+  document.getElementById(`tok4_${pos4}`).className = 'seq-token active';
+
+  const x = SEQ4[pos4];
+  const hOld = h4;
+  const raw = Wh4 * hOld + Wx4 * x;
+  h4 = Math.round(Math.tanh(raw) * 10) / 10;
+
+  const hv = document.getElementById('hVal4');
+  hv.textContent = h4;
+  hv.classList.add('changing');
+  setTimeout(() => hv.classList.remove('changing'), 400);
+  document.getElementById('hCalc4').innerHTML =
+    `0.5 × ${hOld} + 0.8 × ${x} = ${raw.toFixed(1)} → tanh ≈ <span class="hl-green">${h4}</span>`;
+
+  if (pos4 >= 2) {
+    document.getElementById(`tok4_${pos4}`).className = 'seq-token done';
+    document.getElementById('stepBtn4').disabled = true;
+    document.getElementById('page4done').style.display = 'flex';
+  }
+}
+
+// ═══ PAGE 5: Practice ═══
+function check5() {
+  const ans = parseFloat(document.getElementById('answer5').value);
+  const correct = 0.5 * 0.8 + 0.8 * 2; // = 2.0
+  const fb = document.getElementById('fb5');
+  const inp = document.getElementById('answer5');
+  if (Math.abs(ans - correct) < 0.01) {
+    fb.className = 'feedback correct show';
+    fb.textContent = `✅ 正确！0.5 × 0.8 + 0.8 × 2 = 0.4 + 1.6 = ${correct}`;
+    inp.classList.add('correct');
+    document.getElementById('page5done').style.display = 'flex';
+  } else {
+    fb.className = 'feedback wrong show';
+    fb.textContent = '❌ 再算算。h₂ = 0.5 × 0.8 + 0.8 × 2 = ?';
+    inp.classList.add('wrong');
+    setTimeout(() => inp.classList.remove('wrong'), 600);
+  }
+}
+
+// ═══ PAGE 6: Decay visualization ═══
+(function initPage6() {
+  const c = document.getElementById('seq6');
+  const labels = ['x₁', 'x₂', 'x₃', '...', 'x₁₀'];
+  const colors = ['var(--accent)', 'var(--accent)', 'var(--warm)', 'var(--text-dim)', 'var(--danger)'];
+  labels.forEach((l, i) => {
+    const t = document.createElement('div');
+    t.className = 'seq-token';
+    t.textContent = l;
+    t.style.borderColor = colors[i];
+    t.style.color = colors[i];
+    t.style.opacity = Math.max(0.2, 1 - i * 0.2);
+    c.appendChild(t);
+  });
+})();
+
+// ═══ PAGE 7: Flashcards ═══
+let score7 = 0, fc7answered = 0;
+const FC7 = [
+  {q: 'RNN 和普通神经网络最大的区别是什么？', opts: ['层数更多', '有隐藏状态在时间步之间传递', '只能处理图像', '不需要训练'], ans: 1},
+  {q: 'RNN 的隐藏状态 h 的作用是？', opts: ['存储模型参数', '携带之前时间步的信息', '计算损失函数', '决定学习率'], ans: 1},
+  {q: 'RNN 处理长序列时的主要问题是？', opts: ['计算太慢', '内存不够', '梯度消失，遗忘早期信息', '只能处理数字'], ans: 2}
+];
+
+(function initPage7() {
+  const c = document.getElementById('flashcards7');
+  FC7.forEach((q, qi) => {
+    const card = document.createElement('div');
+    card.className = 'flashcard';
+    card.id = `fc7_${qi}`;
+    let h = `<div class="flashcard-q">${qi+1}. ${q.q}</div><div class="flashcard-options">`;
+    q.opts.forEach((o, oi) => {
+      h += `<div class="flashcard-opt" onclick="checkFC7(${qi},${oi},${q.ans})">${o}</div>`;
+    });
+    h += '</div>';
+    card.innerHTML = h;
+    c.appendChild(card);
+  });
+})();
+
+function checkFC7(qi, oi, ans) {
+  const opts = document.querySelectorAll(`#fc7_${qi} .flashcard-opt`);
+  opts.forEach((o, i) => {
+    if (i === ans) o.classList.add('fc-correct');
+    else if (i === oi && oi !== ans) o.classList.add('fc-wrong');
+    o.classList.add('fc-disabled');
+  });
+  if (oi === ans) score7++;
+  fc7answered++;
+  if (fc7answered >= 3) {
+    setTimeout(() => {
+      document.getElementById('finalScore').style.display = 'block';
+      document.getElementById('scoreNum').textContent = score7 + ' / 3';
+      document.getElementById('finalScore').scrollIntoView({behavior:'smooth'});
+    }, 600);
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+理解NOAI资料/
+.DS_Store
+Thumbs.db
+node_modules/
+*.log

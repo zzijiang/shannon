@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LSTM · 长短期记忆网络</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap');
+:root {
+  --bg: #0a0c14; --bg2: #0f1220; --card: #151928; --card-border: #1e2540;
+  --primary: #0080ff; --primary-soft: #0080ff22; --primary-glow: #0080ff40;
+  --accent: #00e5a0; --accent-soft: #00e5a018;
+  --warm: #ff8c42; --warm-soft: #ff8c4220;
+  --danger: #ff5574; --purple: #a855f7; --purple-soft: #a855f720;
+  --text: #cdd4e0; --text-dim: #5a6484; --text-bright: #f0f4ff;
+  --mono: 'JetBrains Mono', monospace; --sans: 'Noto Sans SC', sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+
+.progress-track{position:fixed;top:0;left:0;right:0;height:3px;background:var(--bg2);z-index:100}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));transition:width .6s cubic-bezier(.22,1,.36,1)}
+.step-dots{position:fixed;top:16px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:101}
+.step-dot{width:8px;height:8px;border-radius:50%;background:var(--card-border);transition:all .4s}
+.step-dot.active{background:var(--primary);box-shadow:0 0 10px var(--primary-glow)}
+.step-dot.done{background:var(--accent)}
+
+.container{max-width:720px;margin:0 auto;padding:60px 24px 120px}
+.page{display:none;animation:pageIn .5s cubic-bezier(.22,1,.36,1)}.page.active{display:block}
+@keyframes pageIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+
+.page-number{font-family:var(--mono);font-size:13px;color:var(--primary);letter-spacing:2px;margin-bottom:12px;font-weight:600}
+.page-title{font-size:28px;font-weight:900;color:var(--text-bright);line-height:1.4;margin-bottom:20px;letter-spacing:-.5px}
+.page-desc{font-size:16px;line-height:1.9;color:var(--text);margin-bottom:28px;font-weight:300}
+.page-desc strong{color:var(--text-bright);font-weight:500}
+.hl-blue{color:var(--primary);font-weight:500}
+.hl-green{color:var(--accent);font-weight:500}
+.hl-warm{color:var(--warm);font-weight:500}
+.hl-purple{color:var(--purple);font-weight:500}
+.hl-danger{color:var(--danger);font-weight:500}
+
+.btn{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;border:none;border-radius:10px;font-family:var(--sans);font-size:15px;font-weight:600;cursor:pointer;transition:all .3s;letter-spacing:.5px}
+.btn-primary{background:var(--primary);color:#fff;box-shadow:0 4px 20px var(--primary-glow)}
+.btn-primary:hover{transform:translateY(-2px)}
+.btn-primary:disabled{opacity:.3;cursor:not-allowed;transform:none}
+.btn-secondary{background:var(--card);color:var(--text);border:1px solid var(--card-border)}
+.btn-secondary:hover{background:#1e2540;border-color:var(--primary)}
+.btn-accent{background:var(--accent);color:#0a0c14}.btn-accent:hover{transform:translateY(-2px)}
+.btn-row{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap}
+
+/* ── Metaphor cards ── */
+.metaphor-row{display:flex;gap:16px;margin:24px 0;flex-wrap:wrap}
+.metaphor-card{flex:1;min-width:200px;background:var(--card);border:1px solid var(--card-border);border-radius:14px;padding:20px;text-align:center;transition:all .4s}
+.metaphor-card:hover{border-color:var(--primary);transform:translateY(-3px)}
+.mc-icon{font-size:36px;margin-bottom:10px}
+.mc-title{font-size:15px;font-weight:700;color:var(--text-bright);margin-bottom:8px}
+.mc-desc{font-size:13px;color:var(--text-dim);line-height:1.7}
+
+/* ── Gate visualization ── */
+.gate-container{background:var(--card);border:1px solid var(--card-border);border-radius:16px;padding:24px;margin:24px 0}
+.gate-row{display:flex;align-items:stretch;gap:12px;margin:12px 0;flex-wrap:wrap}
+.gate-box{flex:1;min-width:140px;border-radius:12px;padding:16px;text-align:center;transition:all .5s;border:2px solid transparent}
+.gate-box.forget{background:#ff557418;border-color:#ff557440}
+.gate-box.forget.active{border-color:var(--danger);box-shadow:0 0 20px #ff557430}
+.gate-box.input{background:var(--primary-soft);border-color:#0080ff40}
+.gate-box.input.active{border-color:var(--primary);box-shadow:0 0 20px var(--primary-glow)}
+.gate-box.output{background:var(--purple-soft);border-color:#a855f740}
+.gate-box.output.active{border-color:var(--purple);box-shadow:0 0 20px #a855f730}
+.gate-name{font-size:13px;font-weight:700;margin-bottom:6px;letter-spacing:1px}
+.gate-val{font-family:var(--mono);font-size:28px;font-weight:900;margin:8px 0;transition:all .3s}
+.gate-desc{font-size:12px;color:var(--text-dim);line-height:1.6}
+
+.cell-state-bar{display:flex;align-items:center;justify-content:center;gap:16px;margin:16px 0;padding:16px;background:var(--accent-soft);border:1px solid #00e5a030;border-radius:12px}
+.cs-label{font-size:13px;color:var(--accent)}
+.cs-value{font-family:var(--mono);font-size:32px;font-weight:900;color:var(--accent);transition:all .3s}
+.cs-value.changing{animation:flash .4s ease}
+@keyframes flash{0%,100%{opacity:1}50%{opacity:.3;transform:scale(1.15)}}
+
+.hidden-bar{display:flex;align-items:center;justify-content:center;gap:16px;margin:8px 0;padding:12px;background:var(--purple-soft);border:1px solid #a855f730;border-radius:12px}
+.hb-label{font-size:13px;color:var(--purple)}
+.hb-value{font-family:var(--mono);font-size:24px;font-weight:900;color:var(--purple);transition:all .3s}
+
+.step-explain{background:var(--bg2);border:1px solid var(--card-border);border-radius:10px;padding:14px 18px;margin:12px 0;font-size:14px;line-height:1.8;font-family:var(--mono);color:var(--text);text-align:center}
+
+/* ── Sequence tokens ── */
+.sequence-display{display:flex;gap:6px;justify-content:center;margin:20px 0;flex-wrap:wrap}
+.seq-token{padding:10px 16px;border-radius:10px;font-size:16px;font-weight:700;border:2px solid var(--card-border);background:var(--card);transition:all .4s;text-align:center}
+.seq-token.active{border-color:var(--warm);background:var(--warm-soft);color:var(--warm);transform:scale(1.1)}
+.seq-token.done{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.seq-token.future{opacity:.35}
+
+/* ── Comparison table ── */
+.cmp-table{width:100%;border-collapse:separate;border-spacing:0;margin:24px 0;border-radius:12px;overflow:hidden;border:1px solid var(--card-border)}
+.cmp-table th{background:var(--card);padding:14px;font-size:14px;color:var(--text-bright);font-weight:600;border-bottom:1px solid var(--card-border)}
+.cmp-table td{padding:12px 14px;font-size:13px;border-bottom:1px solid #1a1d30;color:var(--text);line-height:1.6}
+.cmp-table tr:last-child td{border-bottom:none}
+.cmp-table tr:hover td{background:var(--card)}
+
+/* ── Flashcard ── */
+.flashcard{background:var(--card);border:1px solid var(--card-border);border-radius:14px;padding:28px;margin:16px 0}
+.flashcard-q{font-size:16px;color:var(--text-bright);margin-bottom:16px;font-weight:500}
+.flashcard-options{display:flex;flex-direction:column;gap:8px}
+.flashcard-opt{padding:12px 16px;background:var(--bg2);border:1px solid var(--card-border);border-radius:8px;color:var(--text);cursor:pointer;font-size:14px;transition:all .2s;text-align:left}
+.flashcard-opt:hover{border-color:var(--primary);background:var(--primary-soft)}
+.flashcard-opt.fc-correct{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.flashcard-opt.fc-wrong{border-color:var(--danger);background:#ff557418;color:var(--danger)}
+.flashcard-opt.fc-disabled{pointer-events:none;opacity:.5}
+
+.tag-list{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0}
+.tag{padding:8px 18px;background:var(--primary-soft);border:1px solid #0080ff30;border-radius:20px;font-size:14px;color:var(--primary);font-weight:500}
+
+.score-display{text-align:center;padding:30px;margin:20px 0}
+.score-number{font-family:var(--mono);font-size:64px;font-weight:900;background:linear-gradient(135deg,var(--primary),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.score-label{font-size:14px;color:var(--text-dim);margin-top:4px}
+
+@media(max-width:600px){
+  .container{padding:50px 16px 100px}.page-title{font-size:22px}
+  .gate-row{flex-direction:column}.metaphor-row{flex-direction:column}
+}
+</style>
+</head>
+<body>
+<div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+<div class="step-dots" id="stepDots"></div>
+
+<div class="container">
+
+<!-- ════════ PAGE 1 ════════ -->
+<div class="page active" id="page1">
+  <div class="page-number">01 / 07</div>
+  <div class="page-title">RNN 的问题：<br>记忆力太差</div>
+  <div class="page-desc">
+    上一节我们学了 RNN——它有<strong>隐藏状态</strong>，能处理序列数据。<br><br>
+    但它有个致命问题。试试读这段话：
+  </div>
+  <div style="background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:20px;margin:20px 0;line-height:2;font-size:15px;">
+    <span class="hl-green">"我从小在法国长大，</span>
+    在那里度过了整个童年，上了当地的学校，交了很多朋友，
+    后来去了巴黎读大学，毕业后在一家科技公司工作了三年，
+    然后去了美国硅谷做了两年工程师，又回到欧洲……
+    <span class="hl-warm">所以我的母语是 ______"</span>
+  </div>
+  <div class="page-desc">
+    你知道答案是<strong>法语</strong>，因为你记住了开头的"法国"。<br><br>
+    但 RNN 读到最后时，<span class="hl-danger">"法国"的信息已经几乎消失了</span>——<br>
+    每一步都在乘以小于 1 的权重，经过几十步就约等于零。
+  </div>
+  <div class="btn-row" style="justify-content:flex-end">
+    <button class="btn btn-primary" onclick="goPage(2)">继续 →</button>
+  </div>
+</div>
+
+<!-- ════════ PAGE 2 ════════ -->
+<div class="page" id="page2">
+  <div class="page-number">02 / 07</div>
+  <div class="page-title">LSTM 的解决方案：<br>三道门</div>
+  <div class="page-desc">
+    LSTM（Long Short-Term Memory）加了一条<span class="hl-green">记忆传送带</span>——<br>
+    信息可以在上面<strong>不衰减地</strong>一直传下去。<br><br>
+    然后用<strong>三道门</strong>来控制什么信息上传送带、什么信息被移除：
+  </div>
+  <div class="metaphor-row">
+    <div class="metaphor-card" style="border-color:#ff557440">
+      <div class="mc-icon">🗑️</div>
+      <div class="mc-title" style="color:var(--danger)">遗忘门</div>
+      <div class="mc-desc">Forget Gate<br>决定<strong>丢掉</strong>旧记忆中的哪些部分<br>"法国"这个信息还有用吗？</div>
+    </div>
+    <div class="metaphor-card" style="border-color:#0080ff40">
+      <div class="mc-icon">📥</div>
+      <div class="mc-title" style="color:var(--primary)">输入门</div>
+      <div class="mc-desc">Input Gate<br>决定<strong>写入</strong>什么新信息<br>"美国"这个新信息要不要存？</div>
+    </div>
+    <div class="metaphor-card" style="border-color:#a855f740">
+      <div class="mc-icon">📤</div>
+      <div class="mc-title" style="color:var(--purple)">输出门</div>
+      <div class="mc-desc">Output Gate<br>决定<strong>输出</strong>记忆中的哪些部分<br>回答"母语"时该取出什么？</div>
+    </div>
+  </div>
+  <div class="page-desc" style="font-size:14px;color:var(--text-dim);margin-top:8px">
+    每道门输出 0 到 1 之间的数：0 = 完全关闭，1 = 完全打开。
+  </div>
+  <div class="btn-row" style="justify-content:flex-end">
+    <button class="btn btn-secondary" onclick="goPage(1)">← 返回</button>
+    <button class="btn btn-primary" onclick="goPage(3)">继续 →</button>
+  </div>
+</div>
+
+<!-- ════════ PAGE 3 ════════ -->
+<div class="page" id="page3">
+  <div class="page-number">03 / 07</div>
+  <div class="page-title">用生活场景理解</div>
+  <div class="page-desc">
+    想象你在准备考试，面前有一张<span class="hl-green">笔记纸</span>（记忆单元 C）。<br>
+    每学一章新内容，你会：
+  </div>
+  <div style="background:var(--card);border:1px solid var(--card-border);border-radius:14px;padding:24px;margin:20px 0;line-height:2.2;">
+    <span style="color:var(--danger);font-weight:700">① 遗忘门</span>：划掉笔记上已经过时的内容<br>
+    <span style="font-size:13px;color:var(--text-dim);margin-left:24px">（"这个公式考纲删了，划掉"）</span><br>
+    <span style="color:var(--primary);font-weight:700">② 输入门</span>：把新学的重点写上去<br>
+    <span style="font-size:13px;color:var(--text-dim);margin-left:24px">（"这个定理很重要，记下来"）</span><br>
+    <span style="color:var(--purple);font-weight:700">③ 输出门</span>：考试时，从笔记里挑相关的来回答<br>
+    <span style="font-size:13px;color:var(--text-dim);margin-left:24px">（"这道题问的是XXX，我看看笔记里有没有"）</span>
+  </div>
+  <div class="page-desc" style="font-size:15px;">
+    <strong>笔记纸</strong>就是 LSTM 的<span class="hl-green">记忆单元（Cell State）</span>。<br>
+    三道门控制了<strong>哪些信息留在纸上、哪些被擦掉、哪些被读出来</strong>。
+  </div>
+  <div class="btn-row" style="justify-content:flex-end">
+    <button class="btn btn-primary" onclick="goPage(4)">继续 →</button>
+  </div>
+</div>
+
+<!-- ════════ PAGE 4 ════════ -->
+<div class="page" id="page4">
+  <div class="page-number">04 / 07</div>
+  <div class="page-title">看三道门怎么工作</div>
+  <div class="page-desc">
+    简化场景：LSTM 在读一个句子，记忆当前的<strong>主语</strong>。<br>
+    记忆单元 C 存的是"当前主语的编码"。<br><br>
+    <span class="hl-warm">点击按钮，逐步看每个词如何影响三道门和记忆。</span>
+  </div>
+  <div class="sequence-display" id="seq4"></div>
+  <div class="gate-container">
+    <div class="gate-row">
+      <div class="gate-box forget" id="gForget">
+        <div class="gate-name" style="color:var(--danger)">🗑️ 遗忘门</div>
+        <div class="gate-val" id="gfVal" style="color:var(--danger)">—</div>
+        <div class="gate-desc" id="gfDesc">等待输入...</div>
+      </div>
+      <div class="gate-box input" id="gInput">
+        <div class="gate-name" style="color:var(--primary)">📥 输入门</div>
+        <div class="gate-val" id="giVal" style="color:var(--primary)">—</div>
+        <div class="gate-desc" id="giDesc">等待输入...</div>
+      </div>
+      <div class="gate-box output" id="gOutput">
+        <div class="gate-name" style="color:var(--purple)">📤 输出门</div>
+        <div class="gate-val" id="goVal" style="color:var(--purple)">—</div>
+        <div class="gate-desc" id="goDesc">等待输入...</div>
+      </div>
+    </div>
+    <div class="cell-state-bar">
+      <span class="cs-label">记忆单元 C =</span>
+      <span class="cs-value" id="csVal">空</span>
+    </div>
+    <div class="hidden-bar">
+      <span class="hb-label">输出 h =</span>
+      <span class="hb-value" id="hVal">—</span>
+    </div>
+  </div>
+  <div class="step-explain" id="stepExplain4" style="color:var(--text-dim)">点击下方按钮开始 ↓</div>
+  <div class="btn-row" style="justify-content:center">
+    <button class="btn btn-accent" id="stepBtn4" onclick="stepLSTM()">读取下一个词 →</button>
+  </div>
+  <div id="page4done" style="display:none" class="btn-row">
+    <div style="flex:1"></div>
+    <button class="btn btn-primary" onclick="goPage(5)">继续 →</button>
+  </div>
+</div>
+
+<!-- ════════ PAGE 5 ════════ -->
+<div class="page" id="page5">
+  <div class="page-number">05 / 07</div>
+  <div class="page-title">LSTM vs RNN</div>
+  <div class="page-desc">现在你理解了两者的区别：</div>
+  <table class="cmp-table">
+    <tr><th></th><th style="color:var(--warm)">RNN</th><th style="color:var(--accent)">LSTM</th></tr>
+    <tr>
+      <td style="font-weight:600;color:var(--text-bright)">记忆机制</td>
+      <td>只有隐藏状态 h<br><span style="color:var(--text-dim)">每步乘以权重，会衰减</span></td>
+      <td>隐藏状态 h + 记忆单元 C<br><span style="color:var(--text-dim)">C 通过传送带直传，不衰减</span></td>
+    </tr>
+    <tr>
+      <td style="font-weight:600;color:var(--text-bright)">长距离依赖</td>
+      <td><span style="color:var(--danger)">差</span>：几十步后遗忘</td>
+      <td><span style="color:var(--accent)">好</span>：门控制信息保留</td>
+    </tr>
+    <tr>
+      <td style="font-weight:600;color:var(--text-bright)">参数量</td>
+      <td>少（1组权重）</td>
+      <td>多（4组权重：3个门+候选记忆）</td>
+    </tr>
+    <tr>
+      <td style="font-weight:600;color:var(--text-bright)">训练速度</td>
+      <td>快</td>
+      <td>慢（参数多，计算多）</td>
+    </tr>
+    <tr>
+      <td style="font-weight:600;color:var(--text-bright)">适用场景</td>
+      <td>短序列、简单模式</td>
+      <td>长文本、语音、时间序列</td>
+    </tr>
+  </table>
+  <div class="page-desc" style="font-size:14px;color:var(--text-dim)">
+    💡 NOAI 复赛中：2024第3题（文本分类）建议用 LSTM，2025第1题（德语分词）用 BiLSTM 效果最好。
+  </div>
+  <div class="btn-row" style="justify-content:flex-end">
+    <button class="btn btn-primary" onclick="goPage(6)">继续 →</button>
+  </div>
+</div>
+
+<!-- ════════ PAGE 6 ════════ -->
+<div class="page" id="page6">
+  <div class="page-number">06 / 07</div>
+  <div class="page-title">还有一个变种：GRU</div>
+  <div class="page-desc">
+    GRU（Gated Recurrent Unit）是 LSTM 的简化版：<br>
+    把 3 道门合并成 <strong>2 道</strong>（重置门 + 更新门），去掉了独立的记忆单元。
+  </div>
+  <div class="metaphor-row">
+    <div class="metaphor-card">
+      <div class="mc-icon">🏠</div>
+      <div class="mc-title" style="color:var(--accent)">LSTM</div>
+      <div class="mc-desc">3道门 + 记忆单元<br>功能最全，参数最多<br>长序列首选</div>
+    </div>
+    <div class="metaphor-card">
+      <div class="mc-icon">🏕️</div>
+      <div class="mc-title" style="color:var(--primary)">GRU</div>
+      <div class="mc-desc">2道门，更简洁<br>效果接近 LSTM<br>训练更快，适合资源有限</div>
+    </div>
+    <div class="metaphor-card">
+      <div class="mc-icon">🎒</div>
+      <div class="mc-title" style="color:var(--warm)">RNN</div>
+      <div class="mc-desc">没有门<br>最简单，但会遗忘<br>只适合短序列</div>
+    </div>
+  </div>
+  <div class="page-desc" style="font-size:14px;color:var(--text-dim);margin-top:8px">
+    NOAI 考试：知道 GRU 是 LSTM 的简化版就够了。PyTorch 中用 nn.GRU()，接口和 nn.LSTM() 几乎一样。
+  </div>
+  <div class="btn-row" style="justify-content:flex-end">
+    <button class="btn btn-primary" onclick="goPage(7)">继续 →</button>
+  </div>
+</div>
+
+<!-- ════════ PAGE 7 ════════ -->
+<div class="page" id="page7">
+  <div class="page-number">07 / 07</div>
+  <div class="page-title">回顾一下</div>
+  <div class="page-desc">LSTM 的核心概念：</div>
+  <div class="tag-list">
+    <span class="tag">记忆单元 Cell State</span>
+    <span class="tag">遗忘门 Forget Gate</span>
+    <span class="tag">输入门 Input Gate</span>
+    <span class="tag">输出门 Output Gate</span>
+    <span class="tag">解决梯度消失</span>
+    <span class="tag">门的值在 0~1 之间</span>
+  </div>
+  <div class="page-desc" style="margin-top:24px">快速检验 ⚡</div>
+  <div id="flashcards7"></div>
+  <div id="finalScore" style="display:none">
+    <div class="score-display">
+      <div class="score-number" id="scoreNum"></div>
+      <div class="score-label">LSTM 核心概念掌握 🎯</div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+const PAGES = 7;
+let cur = 1;
+
+function goPage(n) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page' + n).classList.add('active');
+  cur = n;
+  document.getElementById('progressFill').style.width = (cur / PAGES * 100) + '%';
+  document.querySelectorAll('.step-dot').forEach((d, i) => {
+    d.className = 'step-dot';
+    if (i + 1 === cur) d.classList.add('active');
+    else if (i + 1 < cur) d.classList.add('done');
+  });
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+(function() {
+  const c = document.getElementById('stepDots');
+  for (let i = 0; i < PAGES; i++) {
+    const d = document.createElement('div');
+    d.className = 'step-dot' + (i === 0 ? ' active' : '');
+    c.appendChild(d);
+  }
+})();
+
+// ═══ PAGE 4: LSTM Gate Simulation ═══
+const WORDS = ['小猫', '喜欢', '吃鱼', '。', '小狗', '在', '追', '它'];
+const STEPS = [
+  {
+    forget: 0.1, input: 0.9, output: 0.3,
+    fDesc: '没有旧主语要忘', iDesc: '"小猫"是主语，写入！', oDesc: '还不需要输出',
+    cell: '小猫', hidden: '—',
+    explain: '遗忘门几乎全关（0.1）= 不删除。输入门大开（0.9）= 把"小猫"写进记忆。'
+  },
+  {
+    forget: 0.9, input: 0.1, output: 0.2,
+    fDesc: '"小猫"仍然是主语，保留', iDesc: '"喜欢"是动词，不是主语', oDesc: '暂不输出',
+    cell: '小猫', hidden: '—',
+    explain: '遗忘门大开（0.9）= 保留旧记忆。输入门几乎关（0.1）= "喜欢"不是关键信息。'
+  },
+  {
+    forget: 0.9, input: 0.1, output: 0.2,
+    fDesc: '继续保留"小猫"', iDesc: '"吃鱼"是宾语，不存', oDesc: '暂不输出',
+    cell: '小猫', hidden: '—',
+    explain: '和上一步一样——句子在继续，但主语没变，记忆不需要更新。'
+  },
+  {
+    forget: 0.9, input: 0.0, output: 0.1,
+    fDesc: '句号不影响记忆', iDesc: '句号没有信息', oDesc: '句子结束',
+    cell: '小猫', hidden: '—',
+    explain: '句号。三道门都接近关闭。记忆中的"小猫"完好保留。'
+  },
+  {
+    forget: 0.1, input: 0.9, output: 0.3,
+    fDesc: '新主语出现，清除"小猫"', iDesc: '"小狗"是新主语，写入！', oDesc: '暂不输出',
+    cell: '小狗', hidden: '—',
+    explain: '关键时刻！遗忘门关闭（0.1）= 清除"小猫"。输入门打开 = 写入"小狗"。主语切换了。'
+  },
+  {
+    forget: 0.9, input: 0.1, output: 0.1,
+    fDesc: '保留"小狗"', iDesc: '"在"不重要', oDesc: '暂不输出',
+    cell: '小狗', hidden: '—',
+    explain: '"在"是介词，不改变主语。记忆不变。'
+  },
+  {
+    forget: 0.9, input: 0.1, output: 0.2,
+    fDesc: '保留"小狗"', iDesc: '"追"是动词', oDesc: '暂不输出',
+    cell: '小狗', hidden: '—',
+    explain: '"追"是动词，主语仍然是"小狗"。记忆不变。'
+  },
+  {
+    forget: 0.9, input: 0.1, output: 0.9,
+    fDesc: '保留"小狗"', iDesc: '"它"需要解析', oDesc: '输出记忆："它"指谁？',
+    cell: '小狗', hidden: '小狗',
+    explain: '输出门大开（0.9）！"它"指代谁？从记忆中取出答案 = "小狗"。这就是 LSTM 的威力。'
+  }
+];
+
+let pos4 = -1;
+
+(function initPage4() {
+  const c = document.getElementById('seq4');
+  WORDS.forEach((w, i) => {
+    const t = document.createElement('div');
+    t.className = 'seq-token future';
+    t.textContent = w;
+    t.id = `tok4_${i}`;
+    c.appendChild(t);
+  });
+})();
+
+function stepLSTM() {
+  pos4++;
+  if (pos4 >= STEPS.length) {
+    document.getElementById('stepBtn4').disabled = true;
+    document.getElementById('page4done').style.display = 'flex';
+    return;
+  }
+
+  // update tokens
+  if (pos4 > 0) document.getElementById(`tok4_${pos4-1}`).className = 'seq-token done';
+  document.getElementById(`tok4_${pos4}`).className = 'seq-token active';
+
+  const s = STEPS[pos4];
+
+  // gates
+  document.getElementById('gfVal').textContent = s.forget.toFixed(1);
+  document.getElementById('giVal').textContent = s.input.toFixed(1);
+  document.getElementById('goVal').textContent = s.output.toFixed(1);
+  document.getElementById('gfDesc').textContent = s.fDesc;
+  document.getElementById('giDesc').textContent = s.iDesc;
+  document.getElementById('goDesc').textContent = s.oDesc;
+
+  // gate active state
+  document.getElementById('gForget').classList.toggle('active', s.forget < 0.5);
+  document.getElementById('gInput').classList.toggle('active', s.input > 0.5);
+  document.getElementById('gOutput').classList.toggle('active', s.output > 0.5);
+
+  // cell state
+  const csv = document.getElementById('csVal');
+  csv.textContent = s.cell;
+  csv.classList.add('changing');
+  setTimeout(() => csv.classList.remove('changing'), 400);
+
+  // hidden
+  document.getElementById('hVal').textContent = s.hidden;
+
+  // explain
+  document.getElementById('stepExplain4').innerHTML = `<strong>读入"${WORDS[pos4]}"</strong>：${s.explain}`;
+  document.getElementById('stepExplain4').style.color = 'var(--text)';
+
+  if (pos4 >= STEPS.length - 1) {
+    document.getElementById(`tok4_${pos4}`).className = 'seq-token done';
+    document.getElementById('stepBtn4').disabled = true;
+    document.getElementById('page4done').style.display = 'flex';
+    document.getElementById('stepExplain4').innerHTML += '<br><br>🎯 <span class="hl-green">记忆穿过了整个句子，"小猫"到"小狗"的切换由门精确控制。这就是 LSTM 的核心。</span>';
+  }
+}
+
+// ═══ PAGE 7: Flashcards ═══
+let score7 = 0, fc7ans = 0;
+const FC7 = [
+  {q: 'LSTM 相比 RNN 多了什么核心组件？', opts: ['更多的隐藏层', '三道门 + 记忆单元（Cell State）', '注意力机制', '更大的词表'], ans: 1},
+  {q: '遗忘门的值接近 0 意味着？', opts: ['保留所有旧记忆', '清除旧记忆', '写入新信息', '输出当前状态'], ans: 1},
+  {q: 'LSTM 解决了 RNN 的什么问题？', opts: ['计算速度太慢', '不能处理图像', '梯度消失导致长距离遗忘', '参数太多'], ans: 2}
+];
+
+(function initPage7() {
+  const c = document.getElementById('flashcards7');
+  FC7.forEach((q, qi) => {
+    const card = document.createElement('div');
+    card.className = 'flashcard';
+    card.id = `fc7_${qi}`;
+    let h = `<div class="flashcard-q">${qi+1}. ${q.q}</div><div class="flashcard-options">`;
+    q.opts.forEach((o, oi) => {
+      h += `<div class="flashcard-opt" onclick="checkFC(${qi},${oi},${q.ans})">${o}</div>`;
+    });
+    h += '</div>';
+    card.innerHTML = h;
+    c.appendChild(card);
+  });
+})();
+
+function checkFC(qi, oi, ans) {
+  const opts = document.querySelectorAll(`#fc7_${qi} .flashcard-opt`);
+  opts.forEach((o, i) => {
+    if (i === ans) o.classList.add('fc-correct');
+    else if (i === oi && oi !== ans) o.classList.add('fc-wrong');
+    o.classList.add('fc-disabled');
+  });
+  if (oi === ans) score7++;
+  fc7ans++;
+  if (fc7ans >= 3) {
+    setTimeout(() => {
+      document.getElementById('finalScore').style.display = 'block';
+      document.getElementById('scoreNum').textContent = score7 + ' / 3';
+      document.getElementById('finalScore').scrollIntoView({behavior:'smooth'});
+    }, 600);
+  }
+}
+</script>
+</body>
+</html>

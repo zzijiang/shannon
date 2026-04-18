@@ -1,0 +1,2465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>香农 · Python 逻辑地基</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<style>
+/* ═══════════════════════════════════════════════════════
+   CSS VARIABLES & RESET
+   ═══════════════════════════════════════════════════════ */
+:root {
+  --bg: #0f1117;
+  --card: #1a1d27;
+  --card-hover: #1e2130;
+  --primary: #0080ff;
+  --primary-light: #4da6ff;
+  --primary-dark: #0066cc;
+  --primary-glow: #0080ff30;
+  --success: #00b894;
+  --success-bg: #00b89418;
+  --danger: #ff6b6b;
+  --danger-bg: #ff6b6b18;
+  --warning: #feca57;
+  --warning-bg: #feca5718;
+  --text: #e2e2e2;
+  --text-dim: #8a8a9a;
+  --text-bright: #ffffff;
+  --border: #2d3044;
+  --input-bg: #0d1017;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --font: 'Segoe UI', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  --sidebar-w: 260px;
+  --topbar-h: 56px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+
+/* ═══════════════════════════════════════════════════════
+   LAYOUT: SIDEBAR + TOPBAR + MAIN
+   ═══════════════════════════════════════════════════════ */
+.app-layout {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-rows: var(--topbar-h) 1fr;
+  min-height: 100vh;
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  grid-row: 1 / -1;
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-logo .logo-icon {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 800; color: #fff;
+}
+.sidebar-logo .logo-text { font-size: 18px; font-weight: 700; color: var(--text-bright); }
+.sidebar-logo .logo-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+.sidebar-stage {
+  padding: 14px 20px 10px;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-top: 1px solid var(--border);
+  transition: color 0.2s;
+}
+.sidebar-stage:first-child { border-top: none; }
+.sidebar-stage:hover { color: var(--text); }
+.sidebar-stage::before {
+  content: '\u25BE';
+  font-size: 10px;
+  transition: transform 0.2s;
+}
+.sidebar-stage.collapsed::before { transform: rotate(-90deg); }
+.sidebar-stage-lessons { overflow: hidden; }
+.sidebar-stage-lessons.hidden { display: none; }
+
+.sidebar-lessons { flex: 1; padding: 0 12px; }
+
+.lesson-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 2px;
+  font-size: 14px;
+  color: var(--text-dim);
+  position: relative;
+}
+.lesson-item:hover { background: #ffffff08; }
+.lesson-item.active { background: var(--primary-glow); color: var(--primary-light); }
+.lesson-item.completed { color: var(--success); }
+.lesson-item.locked { opacity: 0.4; cursor: default; }
+.lesson-item.locked:hover { background: none; }
+
+.lesson-icon {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+  flex-shrink: 0;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  transition: all 0.2s;
+}
+.lesson-item.active .lesson-icon { border-color: var(--primary); background: var(--primary); color: #fff; }
+.lesson-item.completed .lesson-icon { border-color: var(--success); background: var(--success); color: #fff; }
+.lesson-item.checkpoint .lesson-icon { border-radius: 6px; font-size: 11px; }
+
+.lesson-name { flex: 1; line-height: 1.3; }
+.lesson-name-sub { font-size: 11px; color: var(--text-dim); display: block; margin-top: 1px; }
+
+.sidebar-stats {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.stat-row {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 13px; color: var(--text-dim);
+}
+.stat-value { font-weight: 700; color: var(--text); }
+.stat-value.xp { color: var(--primary-light); }
+.stat-value.streak { color: #f9703e; }
+.stat-value.level { color: var(--warning); }
+
+/* ── TOPBAR ── */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.topbar-title { font-size: 16px; font-weight: 600; color: var(--text-bright); }
+.topbar-right { display: flex; align-items: center; gap: 16px; }
+.pyodide-status {
+  font-size: 12px; padding: 4px 12px;
+  border-radius: 12px;
+  display: flex; align-items: center; gap: 6px;
+}
+.pyodide-status.loading { background: var(--warning-bg); color: var(--warning); }
+.pyodide-status.ready { background: var(--success-bg); color: var(--success); }
+.pyodide-status.error { background: var(--danger-bg); color: var(--danger); }
+.pyodide-dot { width: 6px; height: 6px; border-radius: 50%; }
+.pyodide-status.loading .pyodide-dot { background: var(--warning); animation: pulse 1s infinite; }
+.pyodide-status.ready .pyodide-dot { background: var(--success); }
+.pyodide-status.error .pyodide-dot { background: var(--danger); }
+
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+
+.streak-badge {
+  display: flex; align-items: center; gap: 6px;
+  background: linear-gradient(135deg, #f9703e22, #f9703e44);
+  padding: 5px 12px; border-radius: 16px;
+  font-size: 13px; color: #f9703e; font-weight: 600;
+}
+
+/* ── MAIN CONTENT ── */
+.main-content {
+  padding: 32px;
+  overflow-y: auto;
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ═══════════════════════════════════════════════════════
+   PROGRESS BAR (within lesson)
+   ═══════════════════════════════════════════════════════ */
+.progress-wrap {
+  width: 100%; height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  margin-bottom: 28px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--success));
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+/* Phase tabs */
+.phase-tabs {
+  display: flex; gap: 4px; margin-bottom: 24px;
+}
+.phase-tab {
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 13px; font-weight: 500;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--font);
+}
+.phase-tab:hover { border-color: var(--primary); color: var(--text); }
+.phase-tab.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.phase-tab.completed { border-color: var(--success); color: var(--success); }
+.phase-tab.locked { opacity: 0.4; cursor: default; }
+
+/* ═══════════════════════════════════════════════════════
+   PAGE CARD (learn mode)
+   ═══════════════════════════════════════════════════════ */
+.page-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 32px;
+  border: 1px solid var(--border);
+  animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+
+.page-label {
+  font-size: 12px; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+.page-title {
+  font-size: 22px; font-weight: 700;
+  margin-bottom: 16px; line-height: 1.4;
+  color: var(--text-bright);
+}
+.page-desc {
+  font-size: 15px; color: var(--text-dim);
+  line-height: 1.8; margin-bottom: 20px;
+}
+.page-desc strong { color: var(--text); font-weight: 600; }
+
+/* ═══════════════════════════════════════════════════════
+   CODE BLOCKS & EDITORS
+   ═══════════════════════════════════════════════════════ */
+.code-block {
+  background: var(--input-bg);
+  border-radius: var(--radius-sm);
+  padding: 16px 20px;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.8;
+  color: #abb2bf;
+  margin: 16px 0;
+  border: 1px solid #1e2230;
+  overflow-x: auto;
+  white-space: pre;
+}
+.code-block .kw { color: #c678dd; }
+.code-block .fn { color: #61afef; }
+.code-block .str { color: #98c379; }
+.code-block .num { color: #d19a66; }
+.code-block .cm { color: #5c6370; font-style: italic; }
+.code-block .op { color: #56b6c2; }
+.code-block .var { color: #e5c07b; }
+
+.code-inline {
+  background: #1e2230;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: #e5c07b;
+}
+
+/* Code editor */
+.code-editor-wrap {
+  margin: 16px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.code-editor-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px;
+  background: #151822;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px; color: var(--text-dim);
+}
+.code-editor {
+  width: 100%;
+  min-height: 120px;
+  background: var(--input-bg);
+  border: none;
+  color: #abb2bf;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.7;
+  padding: 16px 20px;
+  resize: vertical;
+  outline: none;
+  tab-size: 4;
+}
+.code-editor:focus { background: #0e1119; }
+
+.run-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 18px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.2s;
+}
+.run-btn:hover { background: var(--primary-dark); transform: translateY(-1px); }
+.run-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.code-output {
+  background: #0a0d14;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--success);
+  margin-top: 8px;
+  min-height: 40px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.code-output.error { color: var(--danger); }
+.code-output.empty { color: var(--text-dim); font-style: italic; }
+
+/* ═══════════════════════════════════════════════════════
+   OPTIONS (choice questions)
+   ═══════════════════════════════════════════════════════ */
+.options { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+.options.horizontal { flex-direction: row; flex-wrap: wrap; }
+
+.opt-btn {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px;
+  background: #151822;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--font);
+  text-align: left;
+  width: 100%;
+}
+.opt-btn:hover:not(.correct):not(.wrong):not(:disabled) { border-color: var(--primary); background: #1c2035; }
+.opt-btn.correct { border-color: var(--success); background: var(--success-bg); cursor: default; }
+.opt-btn.wrong { border-color: var(--danger); background: var(--danger-bg); cursor: default; }
+.opt-btn:disabled { cursor: default; }
+
+.opt-letter {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+  flex-shrink: 0;
+}
+.opt-btn.correct .opt-letter { background: var(--success); color: #fff; }
+.opt-btn.wrong .opt-letter { background: var(--danger); color: #fff; }
+
+/* ═══════════════════════════════════════════════════════
+   FILL-IN-THE-BLANK
+   ═══════════════════════════════════════════════════════ */
+.fill-blank-wrap {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 16px 0;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 2.2;
+  background: var(--input-bg);
+  padding: 16px 20px;
+  border-radius: var(--radius-sm);
+  border: 1px solid #1e2230;
+}
+.fill-input {
+  background: #1a1f2e;
+  border: 2px dashed var(--primary);
+  border-radius: 4px;
+  color: #e5c07b;
+  padding: 3px 10px;
+  font-family: var(--mono);
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s;
+  min-width: 80px;
+}
+.fill-input:focus { border-style: solid; border-color: var(--primary-light); }
+.fill-input.correct { border-color: var(--success); border-style: solid; background: #00b89412; }
+.fill-input.wrong { border-color: var(--danger); border-style: solid; }
+
+/* ═══════════════════════════════════════════════════════
+   FEEDBACK
+   ═══════════════════════════════════════════════════════ */
+.feedback {
+  margin-top: 20px;
+  padding: 16px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.7;
+  animation: fadeIn 0.3s;
+}
+.feedback.correct { background: var(--success-bg); border: 1px solid #00b89444; color: #55efc4; }
+.feedback.wrong { background: var(--danger-bg); border: 1px solid #ff6b6b44; color: #ff8e8e; }
+.feedback.info { background: #0080ff18; border: 1px solid #0080ff44; color: var(--primary-light); }
+
+/* ═══════════════════════════════════════════════════════
+   BUTTONS
+   ═══════════════════════════════════════════════════════ */
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 28px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 15px; font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.2s;
+  margin-top: 20px;
+}
+.btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 4px 12px var(--primary-glow); }
+.btn-primary:disabled { opacity: 0.4; cursor: default; transform: none; box-shadow: none; }
+
+.btn-secondary {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 22px;
+  background: transparent;
+  color: var(--primary-light);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.2s;
+}
+.btn-secondary:hover { background: var(--primary-glow); }
+
+.btn-check {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 18px;
+  background: var(--success);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.2s;
+  margin-top: 12px;
+}
+.btn-check:hover { filter: brightness(1.1); }
+
+/* ═══════════════════════════════════════════════════════
+   HEARTS
+   ═══════════════════════════════════════════════════════ */
+.hearts-bar {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 18px;
+}
+.heart { transition: all 0.3s; }
+.heart.lost { opacity: 0.2; transform: scale(0.8); }
+
+/* ═══════════════════════════════════════════════════════
+   CHECKPOINT / SCORE
+   ═══════════════════════════════════════════════════════ */
+.score-card {
+  text-align: center;
+  padding: 40px;
+}
+.score-big {
+  font-size: 64px; font-weight: 800;
+  background: linear-gradient(135deg, var(--primary), var(--success));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+}
+.score-label { font-size: 16px; color: var(--text-dim); margin-bottom: 24px; }
+
+.score-breakdown {
+  display: flex; justify-content: center; gap: 32px;
+  margin: 24px 0;
+  text-align: center;
+}
+.score-stat { display: flex; flex-direction: column; gap: 4px; }
+.score-stat-val { font-size: 24px; font-weight: 700; color: var(--text-bright); }
+.score-stat-label { font-size: 12px; color: var(--text-dim); }
+
+/* Timer */
+.timer-bar {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.timer-bar.warning { color: var(--danger); }
+
+/* ═══════════════════════════════════════════════════════
+   TRUE/FALSE BUTTONS
+   ═══════════════════════════════════════════════════════ */
+.tf-options {
+  display: flex; gap: 12px; margin-top: 20px;
+}
+.tf-btn {
+  flex: 1;
+  padding: 16px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: #151822;
+  color: var(--text);
+  font-size: 16px; font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--font);
+  text-align: center;
+}
+.tf-btn:hover:not(.correct):not(.wrong):not(:disabled) { border-color: var(--primary); }
+.tf-btn.correct { border-color: var(--success); background: var(--success-bg); }
+.tf-btn.wrong { border-color: var(--danger); background: var(--danger-bg); }
+
+/* ═══════════════════════════════════════════════════════
+   CONFETTI
+   ═══════════════════════════════════════════════════════ */
+.confetti-container {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+.confetti-piece {
+  position: absolute;
+  width: 10px; height: 10px;
+  top: -20px;
+  animation: confettiFall 3s ease-out forwards;
+}
+@keyframes confettiFall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   WELCOME CARD
+   ═══════════════════════════════════════════════════════ */
+.welcome-card {
+  text-align: center;
+  padding: 60px 40px;
+}
+.welcome-card h2 {
+  font-size: 28px; font-weight: 800;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, var(--primary-light), var(--success));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.welcome-card p { font-size: 16px; color: var(--text-dim); line-height: 1.8; margin-bottom: 8px; }
+
+/* ═══════════════════════════════════════════════════════
+   MISC
+   ═══════════════════════════════════════════════════════ */
+.question-counter {
+  font-size: 13px; color: var(--text-dim);
+  margin-bottom: 16px;
+}
+
+.highlight-box {
+  background: #0080ff10;
+  border-left: 3px solid var(--primary);
+  padding: 14px 18px;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  margin: 16px 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--primary-light);
+}
+
+.concept-box {
+  background: #151822;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px 20px;
+  margin: 16px 0;
+}
+.concept-box h4 {
+  font-size: 14px; color: var(--primary-light);
+  margin-bottom: 8px;
+}
+.concept-box p, .concept-box ul {
+  font-size: 14px; color: var(--text-dim);
+  line-height: 1.7;
+}
+.concept-box ul { padding-left: 20px; }
+.concept-box li { margin-bottom: 4px; }
+
+/* Scrollbar for main */
+.main-content::-webkit-scrollbar { width: 6px; }
+.main-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* Selection */
+::selection { background: var(--primary); color: #fff; }
+</style>
+</head>
+<body>
+
+<div class="app-layout">
+  <!-- ═══════ SIDEBAR ═══════ -->
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <!-- ═══════ TOPBAR ═══════ -->
+  <header class="topbar" id="topbar"></header>
+
+  <!-- ═══════ MAIN ═══════ -->
+  <main class="main-content" id="main"></main>
+</div>
+
+<!-- Confetti container -->
+<div class="confetti-container" id="confetti"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   ██  STATE MANAGEMENT
+   ═══════════════════════════════════════════════════════════════ */
+const state = {
+  currentLesson: 0,       // index into LESSONS
+  currentPhase: 'learn',  // 'learn' | 'practice' | null (for checkpoint)
+  currentPage: 0,         // page index within current phase
+  lessonStatus: [],  // initialized in initPhaseStatus()
+  phaseStatus: {},        // { '0-learn':'current', '0-practice':'locked', ... }
+  xp: 0,
+  streak: 1,
+  hearts: 3,
+  maxHearts: 3,
+  answered: {},           // track answered states: "lesson-phase-page" => answer
+  codeContents: {},       // preserve code editor contents
+  checkpointScore: {},    // checkpoint results
+  checkpointTimer: null,
+  checkpointStartTime: null,
+};
+
+// Initialize phase status
+function initPhaseStatus() {
+  // Ensure lessonStatus array matches LESSONS length
+  while (state.lessonStatus.length < LESSONS.length) {
+    state.lessonStatus.push('locked');
+  }
+  // DEV MODE: unlock all lessons
+  state.lessonStatus = state.lessonStatus.map(s => s === 'locked' ? 'current' : s);
+  LESSONS.forEach((l, i) => {
+    if (l.type === 'checkpoint') {
+      state.phaseStatus[i + '-checkpoint'] = 'current';
+    } else {
+      state.phaseStatus[i + '-learn'] = state.lessonStatus[i] === 'completed' ? 'completed' : 'current';
+      state.phaseStatus[i + '-practice'] = state.lessonStatus[i] === 'completed' ? 'completed' : 'current';
+    }
+  });
+}
+
+// Save / Load state
+function saveState() {
+  try {
+    const s = { ...state };
+    delete s.checkpointTimer;
+    localStorage.setItem('shannon-state', JSON.stringify(s));
+  } catch(e) {}
+}
+function loadState() {
+  try {
+    const saved = localStorage.getItem('shannon-state');
+    if (saved) {
+      const s = JSON.parse(saved);
+      Object.assign(state, s);
+      state.checkpointTimer = null;
+    }
+  } catch(e) {}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ██  PYODIDE
+   ═══════════════════════════════════════════════════════════════ */
+let pyodideInstance = null;
+let pyodideReady = false;
+let pyodideLoading = true;
+
+async function initPyodide() {
+  try {
+    pyodideInstance = await loadPyodide();
+    pyodideReady = true;
+    pyodideLoading = false;
+    renderTopbar();
+  } catch(e) {
+    pyodideLoading = false;
+    renderTopbar();
+    console.error('Pyodide load error:', e);
+  }
+}
+
+async function runPython(code) {
+  if (!pyodideReady) return { stdout: '', error: '正在加载 Python 引擎，请稍候...' };
+  try {
+    pyodideInstance.runPython(`
+import sys, io
+sys.stdout = io.StringIO()
+sys.stderr = io.StringIO()
+`);
+    await pyodideInstance.runPythonAsync(code);
+    const stdout = pyodideInstance.runPython('sys.stdout.getvalue()');
+    return { stdout: stdout.trim(), error: null };
+  } catch(e) {
+    const errMsg = translateError(e.message || String(e));
+    return { stdout: '', error: errMsg };
+  }
+}
+
+function translateError(msg) {
+  // Extract just the last line of the traceback for user-friendliness
+  const lines = msg.split('\n').filter(l => l.trim());
+  const lastLine = lines[lines.length - 1] || msg;
+
+  if (lastLine.includes('SyntaxError')) {
+    if (lastLine.includes('EOL while scanning')) return '语法错误：字符串没有正确关闭，检查一下引号是否配对。';
+    if (lastLine.includes('unexpected EOF')) return '语法错误：代码不完整，可能缺少了什么。';
+    if (lastLine.includes('invalid syntax')) return '语法错误：Python 看不懂这行代码，检查拼写和符号。';
+    return '语法错误：' + lastLine.replace('SyntaxError:', '').trim();
+  }
+  if (lastLine.includes('NameError')) {
+    const match = lastLine.match(/name '(.+?)' is not defined/);
+    if (match) return `名称错误：'${match[1]}' 没有定义。是不是忘了赋值，或者字符串忘了加引号？`;
+    return '名称错误：使用了一个不存在的变量名。';
+  }
+  if (lastLine.includes('TypeError')) {
+    if (lastLine.includes('can only concatenate str')) return '类型错误：不能把字符串和数字直接拼接，需要用 str() 转换。';
+    return '类型错误：' + lastLine.replace('TypeError:', '').trim();
+  }
+  if (lastLine.includes('IndentationError')) {
+    return '缩进错误：Python 对缩进（空格）要求很严格，检查是否对齐了。';
+  }
+  if (lastLine.includes('ZeroDivisionError')) return '除零错误：不能除以 0！';
+  if (lastLine.includes('ValueError')) return '值错误：' + lastLine.replace('ValueError:', '').trim();
+  return lastLine;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ██  LESSON DATA
+   ═══════════════════════════════════════════════════════════════ */
+const STAGES = [
+  { name: '第一阶段 · 基础语法', start: 0, end: 6 },
+  { name: '第二阶段 · 核心数据结构', start: 7, end: 13 },
+  { name: '第三阶段 · 函数进阶秘境', start: 14, end: 20 },
+  { name: '第四阶段 · 文件系统与异常防范', start: 21, end: 27 },
+  { name: '第五阶段 · 算法逻辑与调用栈', start: 28, end: 30 },
+  { name: '第六阶段 · 面向对象与正则工程', start: 31, end: 35 },
+];
+
+const LESSONS = [
+  /* ── Stage 1: 基础语法 ── */
+  /* 0  */ { id:'L01', type:'lesson', name:'第一行代码', sub:'Hello World', icon:'01' },
+  /* 1  */ { id:'L02', type:'lesson', name:'变量与数据类型', sub:'Variables', icon:'02' },
+  /* 2  */ { id:'L03', type:'lesson', name:'运算符', sub:'Operators', icon:'03' },
+  /* 3  */ { id:'CP1', type:'checkpoint', name:'单元测试 1', sub:'Lesson 01-03', icon:'\u2713' },
+  /* 4  */ { id:'L04', type:'lesson', name:'条件分支', sub:'Conditions', icon:'04' },
+  /* 5  */ { id:'L05', type:'lesson', name:'循环', sub:'Loops', icon:'05' },
+  /* 6  */ { id:'CP2', type:'checkpoint', name:'单元测试 2', sub:'Lesson 04-05', icon:'\u2713' },
+  /* ── Stage 2: 核心数据结构 ── */
+  /* 7  */ { id:'L06', type:'lesson', name:'列表', sub:'Lists', icon:'06' },
+  /* 8  */ { id:'L07', type:'lesson', name:'元组', sub:'Tuples', icon:'07' },
+  /* 9  */ { id:'L08', type:'lesson', name:'集合', sub:'Sets', icon:'08' },
+  /* 10 */ { id:'L09', type:'lesson', name:'字典', sub:'Dicts', icon:'09' },
+  /* 11 */ { id:'L10', type:'lesson', name:'字符串进阶', sub:'Strings', icon:'10' },
+  /* 12 */ { id:'L11', type:'lesson', name:'推导式', sub:'Comprehensions', icon:'11' },
+  /* 13 */ { id:'CP3', type:'checkpoint', name:'单元测试 3', sub:'Lesson 06-11', icon:'\u2713' },
+  /* ── Stage 3: 函数进阶秘境 ── */
+  /* 14 */ { id:'L12', type:'lesson', name:'函数基础', sub:'Functions', icon:'12' },
+  /* 15 */ { id:'L13', type:'lesson', name:'函数进阶', sub:'Advanced Func', icon:'13' },
+  /* 16 */ { id:'L14', type:'lesson', name:'作用域与命名空间', sub:'Scope', icon:'14' },
+  /* 17 */ { id:'L15', type:'lesson', name:'匿名函数', sub:'Lambda', icon:'15' },
+  /* 18 */ { id:'L16', type:'lesson', name:'装饰器', sub:'Decorators', icon:'16' },
+  /* 19 */ { id:'L17', type:'lesson', name:'生成器', sub:'Generators', icon:'17' },
+  /* 20 */ { id:'CP4', type:'checkpoint', name:'单元测试 4', sub:'Lesson 12-17', icon:'\u2713' },
+  /* ── Stage 4: 文件系统与异常防范 ── */
+  /* 21 */ { id:'L18', type:'lesson', name:'文件读写', sub:'File I/O', icon:'18' },
+  /* 22 */ { id:'L19', type:'lesson', name:'上下文管理器', sub:'with Statement', icon:'19' },
+  /* 23 */ { id:'L20', type:'lesson', name:'异常处理', sub:'Exceptions', icon:'20' },
+  /* 24 */ { id:'L21', type:'lesson', name:'模块与包', sub:'Modules', icon:'21' },
+  /* 25 */ { id:'L22', type:'lesson', name:'os 与 sys', sub:'OS & Sys', icon:'22' },
+  /* 26 */ { id:'L23', type:'lesson', name:'标准库巡礼', sub:'Std Library', icon:'23' },
+  /* 27 */ { id:'CP5', type:'checkpoint', name:'单元测试 5', sub:'Lesson 18-23', icon:'\u2713' },
+  /* ── Stage 5: 算法逻辑与调用栈 ── */
+  /* 28 */ { id:'L24', type:'lesson', name:'内存模型', sub:'Memory Model', icon:'24' },
+  /* 29 */ { id:'L25', type:'lesson', name:'递归', sub:'Recursion', icon:'25' },
+  /* 30 */ { id:'CP6', type:'checkpoint', name:'单元测试 6', sub:'Lesson 24-25', icon:'\u2713' },
+  /* ── Stage 6: 面向对象与正则工程 ── */
+  /* 31 */ { id:'L26', type:'lesson', name:'面向对象基础', sub:'OOP Basics', icon:'26' },
+  /* 32 */ { id:'L27', type:'lesson', name:'继承', sub:'Inheritance', icon:'27' },
+  /* 33 */ { id:'L28', type:'lesson', name:'魔术方法', sub:'Magic Methods', icon:'28' },
+  /* 34 */ { id:'L29', type:'lesson', name:'正则表达式', sub:'Regex', icon:'29' },
+  /* 35 */ { id:'CP7', type:'checkpoint', name:'单元测试 7', sub:'Lesson 26-29', icon:'\u2713' },
+];
+
+/* ═══════════════════════════════════════════════════════════════
+   ██  LEARN PHASE CONTENT
+   Each lesson has an array of pages. Each page has:
+   - title, desc (HTML strings)
+   - type: 'info' | 'choice' | 'fill' | 'code' | 'predict'
+   - interaction data depending on type
+   ═══════════════════════════════════════════════════════════════ */
+
+const LEARN_PAGES = {
+  /* ─── Lesson 01: Hello World ─── */
+  L01: [
+    {
+      title: '欢迎来到 Python 的世界！',
+      desc: '<p>Python 是世界上最流行的编程语言之一。你只需要一行代码，就能让电脑说话。</p><p>在 Python 中，<code class="code-inline">print()</code> 函数用来<strong>输出</strong>内容到屏幕上。</p>',
+      type: 'info',
+      code: '<span class="fn">print</span>(<span class="str">"你好，世界！"</span>)',
+      codeOutput: '你好，世界！',
+    },
+    {
+      title: '预测一下输出',
+      desc: '<p>看下面这行代码，它会输出什么？</p>',
+      type: 'choice',
+      codeShow: '<span class="fn">print</span>(<span class="str">"Hello Python"</span>)',
+      options: ['Hello Python', 'print("Hello Python")', '"Hello Python"', '报错'],
+      correct: 0,
+      feedback: {
+        correct: 'print() 会把引号里面的内容输出到屏幕上，引号本身不会显示。',
+        wrong: 'print() 会把引号里面的内容原样输出，不包含引号本身。'
+      }
+    },
+    {
+      title: '单引号还是双引号？',
+      desc: '<p>Python 中字符串可以用<strong>单引号</strong>或<strong>双引号</strong>包裹，效果一样：</p>',
+      type: 'choice',
+      codeShow: '<span class="fn">print</span>(<span class="str">\'Hello\'</span>)\n<span class="fn">print</span>(<span class="str">"Hello"</span>)',
+      options: ['两行输出不同内容', '两行输出相同内容 Hello', '第一行报错', '第二行报错'],
+      correct: 1,
+      feedback: {
+        correct: '没错！单引号和双引号在 Python 中效果完全一样。个人习惯用哪个都行。',
+        wrong: '在 Python 中，单引号 \' \' 和双引号 " " 都可以表示字符串，效果完全一样。'
+      }
+    },
+    {
+      title: '注释：给自己写的笔记',
+      desc: '<p><strong>#</strong> 号后面的内容是<strong>注释</strong>，Python 会完全忽略它。注释是写给人看的，帮助理解代码。</p><p>下面代码的输出是什么？</p>',
+      type: 'choice',
+      codeShow: '<span class="cm"># 这是一条注释</span>\n<span class="fn">print</span>(<span class="str">"学编程"</span>)  <span class="cm"># 这也是注释</span>',
+      options: ['# 这是一条注释\\n学编程', '学编程', '学编程  # 这也是注释', '报错'],
+      correct: 1,
+      feedback: {
+        correct: '注释被 Python 完全忽略了，只有 print() 的内容会输出。',
+        wrong: '# 后面的内容是注释，Python 不会执行它。只有 print("学编程") 会产生输出。'
+      }
+    },
+    {
+      title: '动手试试！',
+      desc: '<p>现在轮到你了！写一个 print 语句，输出你的名字。</p><p>例如输出：<code class="code-inline">我叫香农</code></p>',
+      type: 'code',
+      starter: '# 在下面写代码，用 print() 输出你的名字\n',
+      check: (output) => output.length > 0 && !output.includes('Error'),
+      successMsg: '你写出了第一行 Python 代码！print() 是你最常用的函数之一。',
+      failMsg: '记得用 print("你的名字") 的格式，引号不要忘了！',
+    },
+  ],
+
+  /* ─── Lesson 02: Variables ─── */
+  L02: [
+    {
+      title: '变量：给数据贴标签',
+      desc: '<p>想象你有一个盒子，你在上面贴了一个标签叫 <strong>age</strong>，然后把 <strong>14</strong> 放进去。这就是变量！</p><p>在 Python 中用 <code class="code-inline">=</code> 来给变量赋值：</p>',
+      type: 'info',
+      code: '<span class="var">age</span> = <span class="num">14</span>\n<span class="fn">print</span>(<span class="var">age</span>)',
+      codeOutput: '14',
+    },
+    {
+      title: '四种基本数据类型',
+      desc: '<p>Python 中的数据有不同的<strong>类型</strong>，就像现实中有整数、小数、文字、对错：</p>',
+      type: 'choice',
+      extraHTML: `<div class="concept-box"><h4>四种基本类型</h4><ul>
+        <li><strong>int</strong> - 整数：<code class="code-inline">42</code>, <code class="code-inline">-3</code></li>
+        <li><strong>float</strong> - 小数：<code class="code-inline">3.14</code>, <code class="code-inline">-0.5</code></li>
+        <li><strong>str</strong> - 字符串：<code class="code-inline">"hello"</code>, <code class="code-inline">'你好'</code></li>
+        <li><strong>bool</strong> - 布尔值：<code class="code-inline">True</code>, <code class="code-inline">False</code></li>
+      </ul></div><p><code class="code-inline">3.0</code> 是什么类型？</p>`,
+      options: ['int（整数）', 'float（小数）', 'str（字符串）', 'bool（布尔）'],
+      correct: 1,
+      feedback: {
+        correct: '对！只要有小数点，就是 float 类型，即使小数部分是 0。',
+        wrong: '3.0 有小数点，所以是 float（浮点数）类型，即使值等于整数 3。'
+      }
+    },
+    {
+      title: 'type() 检查类型',
+      desc: '<p><code class="code-inline">type()</code> 函数可以告诉你数据的类型。预测下面的输出：</p>',
+      type: 'choice',
+      codeShow: '<span class="var">name</span> = <span class="str">"香农"</span>\n<span class="fn">print</span>(<span class="fn">type</span>(<span class="var">name</span>))',
+      options: ["<class 'str'>", "str", "string", "type: str"],
+      correct: 0,
+      feedback: {
+        correct: '对！type() 返回的格式是 <class \'类型名\'>，字符串的类型名是 str。',
+        wrong: 'type() 返回的格式是 <class \'类型名\'>，不是单独的类型名。'
+      }
+    },
+    {
+      title: '变量命名规则',
+      desc: '<p>Python 变量名有一些规则。下面哪个是<strong>合法</strong>的变量名？</p>',
+      type: 'choice',
+      options: ['2name', 'my-score', 'my_score', 'class'],
+      correct: 2,
+      feedback: {
+        correct: '对！变量名可以包含字母、数字、下划线，但不能以数字开头，不能包含连字符，也不能使用 Python 保留字（如 class）。',
+        wrong: '变量名规则：只能包含字母、数字、下划线(_)；不能以数字开头；不能是 Python 保留字（如 class, if, for 等）；不能包含连字符(-)。'
+      }
+    },
+    {
+      title: '动手试试：创建变量',
+      desc: '<p>创建两个变量并打印出来：</p><ul style="margin:8px 0 0 20px;color:var(--text-dim);font-size:14px;line-height:1.8"><li>变量 <code class="code-inline">name</code>，值为你的名字（字符串）</li><li>变量 <code class="code-inline">age</code>，值为你的年龄（整数）</li></ul><p style="margin-top:8px">让程序输出两行。</p>',
+      type: 'code',
+      starter: '# 创建变量 name 和 age，然后 print 它们\n',
+      check: (output) => {
+        const lines = output.trim().split('\n');
+        return lines.length >= 2;
+      },
+      successMsg: '很好！你已经学会了创建变量和打印它们。',
+      failMsg: '需要创建 name 和 age 两个变量，并分别用 print() 打印。程序应该输出两行。',
+    },
+  ],
+
+  /* ─── Lesson 03: Operators ─── */
+  L03: [
+    {
+      title: 'Python 就是你的计算器',
+      desc: '<p>Python 支持所有基本的数学运算。试试预测结果：</p>',
+      type: 'choice',
+      codeShow: '<span class="fn">print</span>(<span class="num">2</span> + <span class="num">3</span> * <span class="num">4</span>)',
+      options: ['20', '14', '24', '10'],
+      correct: 1,
+      feedback: {
+        correct: '对！Python 遵守数学运算优先级：先乘除，后加减。3*4=12，2+12=14。',
+        wrong: 'Python 遵守数学运算优先级：先乘除后加减。所以 3*4=12 先算，然后 2+12=14。'
+      }
+    },
+    {
+      title: '除法的陷阱',
+      desc: '<p>Python 有两种除法，区别很重要：</p>',
+      type: 'choice',
+      extraHTML: `<div class="concept-box"><h4>两种除法</h4><ul>
+        <li><strong>/</strong> 普通除法：<strong>结果一定是 float</strong>（即使能整除）</li>
+        <li><strong>//</strong> 整除：只保留整数部分（向下取整）</li>
+      </ul></div>`,
+      codeShow: '<span class="fn">print</span>(<span class="num">7</span> / <span class="num">2</span>)\n<span class="fn">print</span>(<span class="num">7</span> // <span class="num">2</span>)',
+      options: ['3.5 和 3.5', '3.5 和 3', '3 和 3', '3.5 和 4'],
+      correct: 1,
+      feedback: {
+        correct: '没错！/ 返回 3.5（float），// 返回 3（整数部分，向下取整）。',
+        wrong: '/ 是普通除法返回 3.5，// 是整除只留整数部分返回 3。'
+      }
+    },
+    {
+      title: '取余和幂运算',
+      desc: '<p>两个很有用的运算符：</p>',
+      type: 'choice',
+      extraHTML: `<div class="concept-box"><h4>% 取余 和 ** 幂</h4><ul>
+        <li><strong>%</strong> 取余数：10 % 3 = 1（10除以3余1）</li>
+        <li><strong>**</strong> 幂运算：2 ** 3 = 8（2的3次方）</li>
+      </ul></div>`,
+      codeShow: '<span class="fn">print</span>(<span class="num">17</span> % <span class="num">5</span>)\n<span class="fn">print</span>(<span class="num">3</span> ** <span class="num">3</span>)',
+      options: ['2 和 27', '3 和 9', '2 和 9', '3 和 27'],
+      correct: 0,
+      feedback: {
+        correct: '对！17 除以 5 商 3 余 2，所以 17%5=2。3 的 3 次方是 27。',
+        wrong: '17 % 5：17 除以 5 等于 3 余 2，所以结果是 2。3 ** 3 = 3 x 3 x 3 = 27。'
+      }
+    },
+    {
+      title: '比较运算符',
+      desc: '<p>比较运算符返回 <code class="code-inline">True</code> 或 <code class="code-inline">False</code>。</p><p><strong>注意</strong>：判断相等用 <code class="code-inline">==</code>（两个等号），一个 <code class="code-inline">=</code> 是赋值！</p>',
+      type: 'choice',
+      codeShow: '<span class="fn">print</span>(<span class="num">5</span> == <span class="num">5</span>)\n<span class="fn">print</span>(<span class="num">3</span> > <span class="num">5</span>)\n<span class="fn">print</span>(<span class="num">10</span> != <span class="num">7</span>)',
+      options: ['True True True', 'True False True', 'True False False', 'False False True'],
+      correct: 1,
+      feedback: {
+        correct: '5等于5是True，3不大于5是False，10不等于7是True。',
+        wrong: '5==5 是 True（相等），3>5 是 False（3不大于5），10!=7 是 True（10确实不等于7）。'
+      }
+    },
+    {
+      title: '类型转换',
+      desc: '<p>不同类型之间不能直接运算。用 <code class="code-inline">int()</code>、<code class="code-inline">float()</code>、<code class="code-inline">str()</code> 来转换类型。</p><p>写一段代码，让程序输出 <code class="code-inline">我今年14岁</code>（年龄用变量存）。</p>',
+      type: 'code',
+      starter: 'age = 14\n# 用 print 输出 "我今年14岁"\n# 提示：数字和字符串不能直接用 + 拼接\n',
+      check: (output) => output.includes('14') && output.includes('岁'),
+      successMsg: '太棒了！你可以用 str(age) 把数字转成字符串再拼接，或者用逗号分隔多个参数传给 print。',
+      failMsg: '提示：可以用 print("我今年" + str(age) + "岁") 或 print("我今年", age, "岁")。',
+    },
+  ],
+
+  /* ─── Lesson 04: Conditions ─── */
+  L04: [
+    {
+      title: '让程序做选择',
+      desc: '<p>生活中到处是选择：如果下雨，带伞；否则不带。Python 用 <code class="code-inline">if</code> / <code class="code-inline">else</code> 实现这种逻辑。</p>',
+      type: 'info',
+      code: '<span class="var">score</span> = <span class="num">85</span>\n<span class="kw">if</span> <span class="var">score</span> >= <span class="num">60</span>:\n    <span class="fn">print</span>(<span class="str">"及格了！"</span>)\n<span class="kw">else</span>:\n    <span class="fn">print</span>(<span class="str">"需要加油"</span>)',
+      codeOutput: '及格了！',
+    },
+    {
+      title: '缩进非常重要！',
+      desc: '<p>Python 用<strong>缩进（4个空格）</strong>来标记代码块。缩进不对，Python 会报错。</p><p>下面的代码会输出什么？</p>',
+      type: 'choice',
+      codeShow: '<span class="var">x</span> = <span class="num">10</span>\n<span class="kw">if</span> <span class="var">x</span> > <span class="num">5</span>:\n    <span class="fn">print</span>(<span class="str">"大于5"</span>)\n    <span class="fn">print</span>(<span class="str">"确实很大"</span>)\n<span class="fn">print</span>(<span class="str">"结束"</span>)',
+      options: ['大于5', '大于5\\n确实很大', '大于5\\n确实很大\\n结束', '确实很大\\n结束'],
+      correct: 2,
+      feedback: {
+        correct: '对！前两行有缩进，在 if 的代码块里。"结束" 没有缩进，不管条件如何都会执行。',
+        wrong: '有缩进的两行属于 if 代码块（条件为真时执行）。最后一行没有缩进，不属于 if，始终执行。'
+      }
+    },
+    {
+      title: 'elif：多个条件分支',
+      desc: '<p>当有多种情况时，用 <code class="code-inline">elif</code>（else if 的缩写）：</p><p>如果 score 是 75，输出什么？</p>',
+      type: 'choice',
+      codeShow: '<span class="var">score</span> = <span class="num">75</span>\n<span class="kw">if</span> <span class="var">score</span> >= <span class="num">90</span>:\n    <span class="fn">print</span>(<span class="str">"优秀"</span>)\n<span class="kw">elif</span> <span class="var">score</span> >= <span class="num">70</span>:\n    <span class="fn">print</span>(<span class="str">"良好"</span>)\n<span class="kw">elif</span> <span class="var">score</span> >= <span class="num">60</span>:\n    <span class="fn">print</span>(<span class="str">"及格"</span>)\n<span class="kw">else</span>:\n    <span class="fn">print</span>(<span class="str">"不及格"</span>)',
+      options: ['优秀', '良好', '及格', '良好\\n及格'],
+      correct: 1,
+      feedback: {
+        correct: '对！Python 从上到下检查条件，75>=90 不满足，75>=70 满足，输出"良好"后就跳出了，不会继续检查后面的 elif。',
+        wrong: 'if/elif/else 是从上到下检查的，一旦某个条件满足就执行对应代码块并跳出，不会继续往下。'
+      }
+    },
+    {
+      title: '逻辑运算符：and / or / not',
+      desc: '<p>多个条件可以组合：</p>',
+      type: 'choice',
+      extraHTML: `<div class="concept-box"><h4>逻辑运算符</h4><ul>
+        <li><strong>and</strong> - 两个都为 True 才是 True</li>
+        <li><strong>or</strong> - 任意一个 True 就是 True</li>
+        <li><strong>not</strong> - 取反：True 变 False，False 变 True</li>
+      </ul></div>`,
+      codeShow: '<span class="var">age</span> = <span class="num">14</span>\n<span class="var">has_id</span> = <span class="kw">True</span>\n<span class="fn">print</span>(<span class="var">age</span> >= <span class="num">12</span> <span class="kw">and</span> <span class="var">has_id</span>)',
+      options: ['True', 'False', '14', '报错'],
+      correct: 0,
+      feedback: {
+        correct: '对！14>=12 是 True，has_id 是 True，True and True = True。',
+        wrong: '14>=12 是 True，has_id 也是 True，and 要求两边都为 True，所以结果是 True。'
+      }
+    },
+    {
+      title: '动手试试：判断奇偶',
+      desc: '<p>写一个程序，判断变量 <code class="code-inline">num</code> 是奇数还是偶数。</p><ul style="margin:8px 0 0 20px;color:var(--text-dim);font-size:14px;line-height:1.8"><li>偶数输出 <code class="code-inline">偶数</code></li><li>奇数输出 <code class="code-inline">奇数</code></li></ul><p style="margin-top:8px">提示：用 <code class="code-inline">%</code> 取余。</p>',
+      type: 'code',
+      starter: 'num = 7\n# 判断 num 是奇数还是偶数\n',
+      check: (output) => output.trim() === '奇数',
+      successMsg: '完美！n % 2 == 0 就是偶数，否则就是奇数。这是非常经典的判断方法。',
+      failMsg: '提示：如果 num % 2 == 0 那就是偶数，否则是奇数。记得用 print 输出结果。',
+    },
+  ],
+
+  /* ─── Lesson 05: Loops ─── */
+  L05: [
+    {
+      title: '为什么需要循环？',
+      desc: '<p>如果要输出 1 到 5，你可以写 5 个 print。但如果要到 1000 呢？</p><p><code class="code-inline">for</code> 循环让你用几行代码做重复的事。</p>',
+      type: 'info',
+      code: '<span class="kw">for</span> <span class="var">i</span> <span class="kw">in</span> <span class="fn">range</span>(<span class="num">5</span>):\n    <span class="fn">print</span>(<span class="var">i</span>)',
+      codeOutput: '0\n1\n2\n3\n4',
+    },
+    {
+      title: 'range() 的三种用法',
+      desc: '<p><code class="code-inline">range()</code> 生成数字序列：</p>',
+      type: 'choice',
+      extraHTML: `<div class="concept-box"><h4>range() 三种形式</h4><ul>
+        <li><strong>range(n)</strong> - 0 到 n-1</li>
+        <li><strong>range(a, b)</strong> - a 到 b-1</li>
+        <li><strong>range(a, b, step)</strong> - a 开始，每次加 step，到 b 前停</li>
+      </ul></div><p><code class="code-inline">range(2, 8, 2)</code> 产生哪些数字？</p>`,
+      options: ['2, 4, 6', '2, 4, 6, 8', '2, 3, 4, 5, 6, 7', '2, 4, 6, 8, 10'],
+      correct: 0,
+      feedback: {
+        correct: '从 2 开始，每次加 2，到 8 之前停下：2, 4, 6。注意 8 不包含在内！',
+        wrong: 'range(2, 8, 2)：从 2 开始，每次 +2，在 8 之前停。所以是 2, 4, 6（不包含 8）。'
+      }
+    },
+    {
+      title: '遍历列表',
+      desc: '<p>for 循环不只能用 range，还能直接遍历列表：</p><p>这段代码输出什么？</p>',
+      type: 'choice',
+      codeShow: '<span class="var">fruits</span> = [<span class="str">"苹果"</span>, <span class="str">"香蕉"</span>, <span class="str">"橘子"</span>]\n<span class="kw">for</span> <span class="var">f</span> <span class="kw">in</span> <span class="var">fruits</span>:\n    <span class="fn">print</span>(<span class="str">"我喜欢"</span> + <span class="var">f</span>)',
+      options: ['我喜欢苹果 香蕉 橘子', '我喜欢苹果\\n我喜欢香蕉\\n我喜欢橘子', '我喜欢[苹果, 香蕉, 橘子]', '报错'],
+      correct: 1,
+      feedback: {
+        correct: '对！循环每次取列表中的一个元素赋给变量 f，然后执行循环体。每次 print 产生一行输出。',
+        wrong: 'for 循环每次取列表中的一个元素，所以会输出三行，每行一个水果。'
+      }
+    },
+    {
+      title: '累加器模式',
+      desc: '<p><strong>累加器</strong>是循环中最常用的模式：先准备一个变量存结果，循环中不断往里加。</p><p>下面这段代码计算的是什么？</p>',
+      type: 'choice',
+      codeShow: '<span class="var">total</span> = <span class="num">0</span>\n<span class="kw">for</span> <span class="var">i</span> <span class="kw">in</span> <span class="fn">range</span>(<span class="num">1</span>, <span class="num">6</span>):\n    <span class="var">total</span> = <span class="var">total</span> + <span class="var">i</span>\n<span class="fn">print</span>(<span class="var">total</span>)',
+      options: ['6', '10', '15', '21'],
+      correct: 2,
+      feedback: {
+        correct: '对！range(1,6) 是 1,2,3,4,5。累加：0+1+2+3+4+5 = 15。',
+        wrong: 'range(1,6) 产生 1,2,3,4,5。total 从 0 开始依次加 1,2,3,4,5，最终 total = 15。'
+      }
+    },
+    {
+      title: '动手试试：求 1 到 100 的和',
+      desc: '<p>用 for 循环计算 1 + 2 + 3 + ... + 100 的结果并打印。</p><p>答案应该是 <strong>5050</strong>（数学家高斯小时候就算过这题！）。</p>',
+      type: 'code',
+      starter: '# 计算 1+2+3+...+100 的和\n',
+      check: (output) => output.trim() === '5050',
+      successMsg: '高斯同款！你已经掌握了循环和累加器模式。',
+      failMsg: '提示：先设 total = 0，再用 for i in range(1, 101) 循环累加。注意 range 的终点不包含 101 本身。',
+    },
+  ],
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   ██  PRACTICE PHASE CONTENT
+   Each lesson has an array of questions.
+   Types: 'choice', 'tf' (true/false), 'fill', 'code'
+   ═══════════════════════════════════════════════════════════════ */
+
+const PRACTICE_QUESTIONS = {
+  L01: [
+    {
+      type: 'choice',
+      question: '下面哪个可以正确输出 Hello？',
+      options: ['print Hello', 'print("Hello")', 'echo("Hello")', 'say("Hello")'],
+      correct: 1,
+      explanation: 'Python 用 print() 函数输出，内容要放在括号里，字符串要用引号包裹。'
+    },
+    {
+      type: 'tf',
+      question: 'print("hello") 和 print(\'hello\') 的输出是一样的。',
+      correct: true,
+      explanation: '单引号和双引号在 Python 中效果完全相同。'
+    },
+    {
+      type: 'fill',
+      question: '补全代码，让它输出 Python',
+      template: ['___', '("Python")'],
+      blanks: [{ answer: 'print', width: 80 }],
+      explanation: 'print() 是 Python 中最基本的输出函数。'
+    },
+    {
+      type: 'choice',
+      question: '# 在 Python 中表示什么？',
+      options: ['乘号', '除号', '注释', '标题'],
+      correct: 2,
+      explanation: '# 后面的内容是注释，Python 会忽略它。注释是给人看的，帮助理解代码。'
+    },
+    {
+      type: 'code',
+      question: '写代码输出两行内容：第一行输出 Hello，第二行输出 World',
+      starter: '# 用两个 print 语句\n',
+      expected: 'Hello\nWorld',
+      explanation: '每个 print() 语句输出一行。'
+    },
+    {
+      type: 'tf',
+      question: 'print(hello) 会输出 hello 这个单词。',
+      correct: false,
+      explanation: '没有引号的 hello 会被当作变量名，如果变量不存在就会报 NameError。要输出文字，必须加引号：print("hello")。'
+    },
+    {
+      type: 'choice',
+      question: '下面哪行代码会报错？',
+      options: ['print("你好")', 'print(\'你好\')', 'print("你好\')', 'print("""你好""")'],
+      correct: 2,
+      explanation: '引号必须配对！开头用双引号，结尾也必须用双引号。"你好\' 混用了不同引号导致错误。'
+    },
+  ],
+
+  L02: [
+    {
+      type: 'choice',
+      question: '下面哪个是合法的变量赋值？',
+      options: ['3x = 10', 'my score = 10', 'score = 10', 'for = 10'],
+      correct: 2,
+      explanation: '变量名不能以数字开头，不能有空格，不能是 Python 保留字（如 for）。'
+    },
+    {
+      type: 'tf',
+      question: 'type(3.0) 的结果是 int。',
+      correct: false,
+      explanation: '3.0 有小数点，所以是 float 类型，不是 int。'
+    },
+    {
+      type: 'fill',
+      question: '补全代码，查看变量 x 的数据类型：',
+      template: ['print(', '___', '(x))'],
+      blanks: [{ answer: 'type', width: 70 }],
+      explanation: 'type() 函数返回数据的类型。'
+    },
+    {
+      type: 'choice',
+      question: 'x = "100"，x 是什么类型？',
+      options: ['int', 'float', 'str', 'bool'],
+      correct: 2,
+      explanation: '用引号包裹的内容是字符串(str)，即使看起来像数字。"100" 是字符串，100（无引号）才是整数。'
+    },
+    {
+      type: 'code',
+      question: '创建变量 x = 5，y = 3，打印它们的和（输出 8）',
+      starter: '# 创建变量并打印和\n',
+      expected: '8',
+      explanation: 'x + y 得到 8，用 print(x + y) 输出。'
+    },
+    {
+      type: 'choice',
+      question: '执行 a = 10; b = a; a = 20 后，b 的值是？',
+      options: ['10', '20', '30', '报错'],
+      correct: 0,
+      explanation: 'b = a 时，b 获得了 a 当时的值 10。之后 a 变成 20，不影响 b。'
+    },
+  ],
+
+  L03: [
+    {
+      type: 'choice',
+      question: '10 / 3 的结果是？',
+      options: ['3', '3.33', '3.3333333333333335', '3.3333333333333335（float 类型）'],
+      correct: 3,
+      explanation: '/ 运算结果一定是 float 类型。Python 中 10/3 ≈ 3.3333333333333335。'
+    },
+    {
+      type: 'tf',
+      question: '10 // 3 的结果是 3。',
+      correct: true,
+      explanation: '// 是整除运算，只保留整数部分。10 // 3 = 3（余数 1 被丢弃）。'
+    },
+    {
+      type: 'fill',
+      question: '补全代码，计算 2 的 10 次方：',
+      template: ['print(2 ', '___', ' 10)'],
+      blanks: [{ answer: '**', width: 50 }],
+      explanation: '** 是幂运算符，2 ** 10 = 1024。'
+    },
+    {
+      type: 'choice',
+      question: '15 % 4 的结果是？',
+      options: ['3', '3.75', '4', '1'],
+      correct: 0,
+      explanation: '% 是取余运算。15 除以 4 商 3 余 3，所以 15 % 4 = 3。'
+    },
+    {
+      type: 'code',
+      question: '用 Python 计算并打印：(100 - 32) 除以 1.8 的结果（华氏度转摄氏度公式）',
+      starter: '# 计算华氏度 100 转摄氏度\n',
+      expected: '37.77777777777778',
+      explanation: '(100 - 32) / 1.8 = 37.77777777777778'
+    },
+    {
+      type: 'choice',
+      question: '"3" + "5" 的结果是？',
+      options: ['8', '35', '"35"', '报错'],
+      correct: 2,
+      explanation: '字符串的 + 是拼接操作，不是数学加法。"3" + "5" = "35"（字符串）。'
+    },
+  ],
+
+  L04: [
+    {
+      type: 'choice',
+      question: 'if 语句后面必须跟什么符号？',
+      options: ['分号 ;', '冒号 :', '大括号 {', '等号 ='],
+      correct: 1,
+      explanation: 'Python 的 if 语句以冒号 : 结尾，下一行要缩进 4 个空格。'
+    },
+    {
+      type: 'tf',
+      question: 'if x = 5: 这行代码是正确的。',
+      correct: false,
+      explanation: '= 是赋值，== 才是比较。if 语句需要比较条件，应该写 if x == 5:'
+    },
+    {
+      type: 'choice',
+      question: 'x = 3 时，下面哪个表达式是 True？',
+      options: ['x > 5', 'x == 2', 'x != 3', 'x <= 3'],
+      correct: 3,
+      explanation: 'x=3 时：3>5 是 False，3==2 是 False，3!=3 是 False，3<=3 是 True。'
+    },
+    {
+      type: 'fill',
+      question: '补全条件：如果 age 大于等于 18',
+      template: ['if age ', '___', ' 18:'],
+      blanks: [{ answer: '>=', width: 50 }],
+      explanation: '>= 表示大于等于。'
+    },
+    {
+      type: 'code',
+      question: '写一个程序：如果 n 能被 3 整除就输出 Fizz，否则输出数字本身。n = 9。',
+      starter: 'n = 9\n# 判断 n 能否被 3 整除\n',
+      expected: 'Fizz',
+      explanation: 'n % 3 == 0 说明能被 3 整除。'
+    },
+    {
+      type: 'choice',
+      question: 'True and False 的结果是？',
+      options: ['True', 'False', '报错', 'None'],
+      correct: 1,
+      explanation: 'and 要求两边都为 True 才返回 True。一边是 False，结果就是 False。'
+    },
+  ],
+
+  L05: [
+    {
+      type: 'choice',
+      question: 'range(5) 产生哪些数字？',
+      options: ['1,2,3,4,5', '0,1,2,3,4', '0,1,2,3,4,5', '1,2,3,4'],
+      correct: 1,
+      explanation: 'range(5) 从 0 开始，到 5 之前停，产生 0,1,2,3,4 共 5 个数。'
+    },
+    {
+      type: 'tf',
+      question: 'range(1, 10) 包含数字 10。',
+      correct: false,
+      explanation: 'range 的终点是不包含的。range(1, 10) 产生 1 到 9。'
+    },
+    {
+      type: 'fill',
+      question: '补全代码，循环打印 0 到 4：',
+      template: ['for i in ', '___', '(5):\n    print(i)'],
+      blanks: [{ answer: 'range', width: 80 }],
+      explanation: 'range(5) 生成 0,1,2,3,4。'
+    },
+    {
+      type: 'choice',
+      question: '下面代码输出什么？\nfor i in range(3):\n    print("*")',
+      options: ['***', '*\\n*\\n*', '* * *', '012'],
+      correct: 1,
+      explanation: '循环执行 3 次，每次 print("*") 输出一行星号。'
+    },
+    {
+      type: 'code',
+      question: '用循环打印 1 到 5 的平方（每行一个数：1, 4, 9, 16, 25）',
+      starter: '# 打印 1 到 5 的平方\n',
+      expected: '1\n4\n9\n16\n25',
+      explanation: 'for i in range(1, 6): print(i ** 2)'
+    },
+    {
+      type: 'choice',
+      question: '下面哪段代码可以计算列表元素的总和？',
+      options: [
+        'nums = [1,2,3]\nprint(sum)',
+        'nums = [1,2,3]\ntotal = 0\nfor n in nums:\n    total = total + n\nprint(total)',
+        'nums = [1,2,3]\nfor n in nums:\n    total = n\nprint(total)',
+        'nums = [1,2,3]\ntotal = 0\ntotal = total + nums\nprint(total)'
+      ],
+      correct: 1,
+      explanation: '累加器模式：先初始化 total=0，循环中逐个加，最后打印结果。选项 C 每次覆盖而非累加，选项 D 列表不能直接加到数字上。'
+    },
+    {
+      type: 'code',
+      question: '找出列表 nums 中的最大值并打印（不要用 max 函数）',
+      starter: 'nums = [3, 7, 2, 9, 5]\n# 找出最大值\n',
+      expected: '9',
+      explanation: '设 biggest = nums[0]，循环比较每个元素，更大就替换。'
+    },
+  ],
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   ██  CHECKPOINT CONTENT
+   ═══════════════════════════════════════════════════════════════ */
+
+const CHECKPOINT_QUESTIONS = {
+  CP1: [
+    { type:'choice', question:'下面哪个不是 Python 的合法变量名？', options:['_score','my_name','2nd_place','hello123'], correct:2, explanation:'变量名不能以数字开头。' },
+    { type:'choice', question:'print(10 / 5) 输出什么？', options:['2','2.0','2.00','报错'], correct:1, explanation:'/ 运算结果一定是 float，所以 10/5 = 2.0。' },
+    { type:'tf', question:'True 和 False 的首字母必须大写。', correct:true, explanation:'Python 的布尔值是 True 和 False（大写开头），true 和 false 会被当作未定义变量。' },
+    { type:'tf', question:'"hello" + 123 在 Python 中会自动转换类型并拼接。', correct:false, explanation:'Python 不会自动类型转换，字符串和数字不能直接用 + 连接，需要用 str() 转换。' },
+    { type:'tf', question:'# 这是注释 这行代码执行后什么都不会发生。', correct:true, explanation:'# 后面的内容是注释，Python 完全忽略。' },
+    { type:'fill', question:'补全代码输出 42：', template:['___','(42)'], blanks:[{answer:'print',width:80}], explanation:'print() 用来输出内容。' },
+    { type:'fill', question:'补全代码把字符串 "100" 转成整数：', template:['x = ','___','("100")'], blanks:[{answer:'int',width:60}], explanation:'int() 可以把字符串转成整数。' },
+    { type:'code', question:'创建变量 a=10, b=20，交换它们的值后打印（先打印 a 再打印 b，应该输出 20 然后 10）', starter:'a = 10\nb = 20\n# 交换 a 和 b 的值\n', expected:'20\n10', explanation:'Python 可以用 a, b = b, a 来交换。' },
+    { type:'code', question:'写代码计算 2 的 8 次方并打印结果（应输出 256）', starter:'# 计算 2 的 8 次方\n', expected:'256', explanation:'2 ** 8 = 256' },
+    { type:'code', question:'用 print 输出三行：Python、很、有趣（每行一个词）', starter:'# 输出三行\n', expected:'Python\n很\n有趣', explanation:'用三个 print() 语句即可。' },
+  ],
+
+  CP2: [
+    { type:'choice', question:'for i in range(1, 10, 2) 循环几次？', options:['4','5','9','10'], correct:1, explanation:'range(1,10,2) 产生 1,3,5,7,9 共 5 个数。' },
+    { type:'choice', question:'下面哪段代码可以判断一个数是否为正数？', options:['if n > 0:','if n is positive:','if n >= 0:','if positive(n):'], correct:0, explanation:'n > 0 判断是否为正数（不含0）。>= 包含了0，0不算正数。' },
+    { type:'tf', question:'for i in range(0): 这个循环一次都不会执行。', correct:true, explanation:'range(0) 产生空序列，循环体不会执行。' },
+    { type:'tf', question:'if True or False: 下面的代码块会执行。', correct:true, explanation:'or 只要一边为 True 就是 True，所以 True or False = True。' },
+    { type:'tf', question:'Python 中 elif 是 else if 的缩写。', correct:true, explanation:'elif 是 Python 特有的 else if 缩写。' },
+    { type:'fill', question:'补全循环，打印 0 到 9：', template:['for i in range(','___','):\n    print(i)'], blanks:[{answer:'10',width:50}], explanation:'range(10) 产生 0-9。' },
+    { type:'fill', question:'补全条件：如果 x 不等于 0', template:['if x ','___',' 0:'], blanks:[{answer:'!=',width:50}], explanation:'!= 是不等于运算符。' },
+    { type:'code', question:'写一个程序：打印 1 到 20 之间所有奇数（每行一个）', starter:'# 打印 1 到 20 的奇数\n', expected:'1\n3\n5\n7\n9\n11\n13\n15\n17\n19', explanation:'可以用 range(1,20,2) 或在循环中用 if i%2!=0 判断。' },
+    { type:'code', question:'写一个程序判断 n=17 是否为质数。是质数输出"质数"，否则输出"不是质数"。', starter:'n = 17\n# 判断是否为质数\n', expected:'质数', explanation:'质数只能被 1 和自身整除。可以用循环从 2 到 n-1 检查是否有能整除的数。' },
+    { type:'code', question:'写一个成绩等级程序。score=78，>=90输出A，>=80输出B，>=70输出C，>=60输出D，否则输出F', starter:'score = 78\n# 判断等级\n', expected:'C', explanation:'用 if/elif/else 多分支判断。' },
+  ],
+};
+
+</script>
+<script src="lessons-data.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   ██  RENDERING FUNCTIONS
+   ═══════════════════════════════════════════════════════════════ */
+
+function render() {
+  renderSidebar();
+  renderTopbar();
+  renderMain();
+}
+
+/* ── SIDEBAR ── */
+function renderSidebar() {
+  const completedCount = state.lessonStatus.filter(s => s === 'completed').length;
+  const LEVELS = [
+    { xp: 0, name: '初学者' }, { xp: 100, name: '入门学徒' }, { xp: 300, name: '探索者' },
+    { xp: 600, name: '实践者' }, { xp: 1000, name: '构建者' }, { xp: 1500, name: '大师' },
+  ];
+  const level = LEVELS.slice().reverse().find(l => state.xp >= l.xp)?.name || '初学者';
+
+  let lessonsHTML = '';
+  STAGES.forEach((stage) => {
+    // Check if any lesson in this stage is unlocked/completed/current
+    let stageHasActivity = false;
+    for (let i = stage.start; i <= stage.end; i++) {
+      if (state.lessonStatus[i] !== 'locked') { stageHasActivity = true; break; }
+    }
+    // Current stage = contains the current lesson
+    const isCurrentStage = (state.currentLesson >= stage.start && state.currentLesson <= stage.end);
+    // Collapsed by default unless it's the current stage or has activity
+    const collapsed = !isCurrentStage && !stageHasActivity;
+
+    lessonsHTML += `<div class="sidebar-stage ${collapsed ? 'collapsed' : ''}" onclick="this.classList.toggle('collapsed')">${stage.name}</div>`;
+    lessonsHTML += `<div class="sidebar-stage-lessons ${collapsed ? 'hidden' : ''}">`;
+    for (let i = stage.start; i <= stage.end; i++) {
+      const l = LESSONS[i];
+      const status = state.lessonStatus[i];
+      const isCurrent = (i === state.currentLesson);
+      const cls = isCurrent ? 'active' : status;
+      const typeCls = l.type === 'checkpoint' ? ' checkpoint' : '';
+      lessonsHTML += `<div class="lesson-item ${cls}${typeCls}" data-lesson="${i}" onclick="event.stopPropagation();selectLesson(${i})">
+        <div class="lesson-icon">${status === 'completed' ? '\u2713' : l.icon}</div>
+        <div class="lesson-name">
+          ${l.type === 'checkpoint' ? '\uD83D\uDCCB ' : ''}${l.name}
+          <span class="lesson-name-sub">${l.sub}</span>
+        </div>
+      </div>`;
+    }
+    lessonsHTML += '</div>';
+  });
+
+  document.getElementById('sidebar').innerHTML = `
+    <div class="sidebar-logo">
+      <div class="logo-icon">S</div>
+      <div>
+        <div class="logo-text">香农</div>
+        <div class="logo-sub">Shannon Learning</div>
+      </div>
+    </div>
+    <div class="sidebar-lessons">${lessonsHTML}</div>
+    <div class="sidebar-stats">
+      <div class="stat-row"><span>XP 经验值</span><span class="stat-value xp">${state.xp}</span></div>
+      <div class="stat-row"><span>连续学习</span><span class="stat-value streak">\uD83D\uDD25 ${state.streak} 天</span></div>
+      <div class="stat-row"><span>等级</span><span class="stat-value level">${level}</span></div>
+    </div>
+  `;
+}
+
+/* ── TOPBAR ── */
+function renderTopbar() {
+  const lesson = LESSONS[state.currentLesson];
+  const pyoStatus = pyodideReady ? 'ready' : (pyodideLoading ? 'loading' : 'error');
+  const pyoText = pyodideReady ? 'Python 就绪' : (pyodideLoading ? '加载中...' : '加载失败');
+
+  document.getElementById('topbar').innerHTML = `
+    <div class="topbar-title">${lesson.name}</div>
+    <div class="topbar-right">
+      <div class="pyodide-status ${pyoStatus}">
+        <span class="pyodide-dot"></span>
+        ${pyoText}
+      </div>
+      <div class="streak-badge">\uD83D\uDD25 ${state.streak}</div>
+    </div>
+  `;
+}
+
+/* ── MAIN CONTENT ── */
+function renderMain() {
+  const lesson = LESSONS[state.currentLesson];
+  const mainEl = document.getElementById('main');
+
+  if (lesson.type === 'checkpoint') {
+    renderCheckpoint(mainEl);
+  } else {
+    renderLessonContent(mainEl);
+  }
+}
+
+/* ── LESSON CONTENT (Learn + Practice) ── */
+function renderLessonContent(mainEl) {
+  const lesson = LESSONS[state.currentLesson];
+  const learnStatus = state.phaseStatus[state.currentLesson + '-learn'] || 'locked';
+  const practiceStatus = state.phaseStatus[state.currentLesson + '-practice'] || 'locked';
+
+  // Phase tabs
+  const learnCls = state.currentPhase === 'learn' ? 'active' : (learnStatus === 'completed' ? 'completed' : '');
+  const practiceCls = state.currentPhase === 'practice' ? 'active' : (practiceStatus === 'completed' ? 'completed' : (practiceStatus === 'locked' ? 'locked' : ''));
+
+  let html = `
+    <div class="phase-tabs">
+      <button class="phase-tab ${learnCls}" onclick="switchPhase('learn')">\uD83D\uDCD6 引导探索</button>
+      <button class="phase-tab ${practiceCls}" ${practiceStatus === 'locked' ? 'disabled' : ''} onclick="switchPhase('practice')">\u26A1 刷卡练习</button>
+    </div>
+  `;
+
+  if (state.currentPhase === 'learn') {
+    html += renderLearnPhase();
+  } else if (state.currentPhase === 'practice') {
+    html += renderPracticePhase();
+  }
+
+  mainEl.innerHTML = html;
+  attachEventListeners();
+}
+
+/* ── LEARN PHASE ── */
+function renderLearnPhase() {
+  const lesson = LESSONS[state.currentLesson];
+  const pages = LEARN_PAGES[lesson.id];
+  if (!pages) return '<div class="page-card"><p>课程内容加载中...</p></div>';
+
+  const page = pages[state.currentPage];
+  const progress = ((state.currentPage + 1) / pages.length) * 100;
+  const stateKey = `${state.currentLesson}-learn-${state.currentPage}`;
+  const answered = state.answered[stateKey];
+
+  let html = `
+    <div class="progress-wrap"><div class="progress-fill" style="width:${progress}%"></div></div>
+    <div class="page-card">
+      <div class="page-label">第 ${state.currentPage + 1} / ${pages.length} 页</div>
+      <div class="page-title">${page.title}</div>
+      <div class="page-desc">${page.desc}</div>
+  `;
+
+  // Extra HTML (concept boxes etc)
+  if (page.extraHTML) {
+    html += page.extraHTML;
+  }
+
+  // Code display
+  if (page.code) {
+    html += `<div class="code-block">${page.code}</div>`;
+    if (page.codeOutput) {
+      html += `<div class="code-output">${escapeHTML(page.codeOutput)}</div>`;
+    }
+  }
+  if (page.codeShow) {
+    html += `<div class="code-block">${page.codeShow}</div>`;
+  }
+
+  // Interaction based on type
+  if (page.type === 'info') {
+    html += renderContinueBtn(true);
+  } else if (page.type === 'choice') {
+    html += renderChoiceInteraction(page, stateKey, answered);
+  } else if (page.type === 'fill') {
+    html += renderFillInteraction(page, stateKey, answered);
+  } else if (page.type === 'code') {
+    html += renderCodeInteraction(page, stateKey, answered);
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function renderChoiceInteraction(page, stateKey, answered) {
+  let html = '<div class="options">';
+  const letters = ['A', 'B', 'C', 'D'];
+  page.options.forEach((opt, i) => {
+    let cls = '';
+    let disabled = '';
+    if (answered !== undefined) {
+      disabled = 'disabled';
+      if (i === page.correct) cls = 'correct';
+      else if (i === answered) cls = 'wrong';
+    }
+    // Unescape \\n for display
+    const displayOpt = opt.replace(/\\n/g, '<br>');
+    html += `<button class="opt-btn ${cls}" ${disabled} onclick="handleLearnChoice(${i}, ${page.correct}, '${stateKey}')">
+      <span class="opt-letter">${letters[i]}</span>
+      <span>${displayOpt}</span>
+    </button>`;
+  });
+  html += '</div>';
+
+  if (answered !== undefined) {
+    const isCorrect = answered === page.correct;
+    html += `<div class="feedback ${isCorrect ? 'correct' : 'wrong'}">${isCorrect ? '\u2705 ' : '\u274C '}${page.feedback[isCorrect ? 'correct' : 'wrong']}</div>`;
+    html += renderContinueBtn(true);
+  }
+  return html;
+}
+
+function renderFillInteraction(page, stateKey, answered) {
+  let html = '<div class="fill-blank-wrap">';
+  page.template.forEach((part, i) => {
+    if (part === '___') {
+      const blank = page.blanks[0]; // simplified: 1 blank per question
+      const val = answered !== undefined ? blank.answer : (state.codeContents[stateKey] || '');
+      const cls = answered !== undefined ? (answered ? 'correct' : 'wrong') : '';
+      html += `<input class="fill-input ${cls}" style="width:${blank.width}px" value="${escapeHTML(val)}" data-key="${stateKey}" ${answered !== undefined ? 'readonly' : ''} onkeydown="if(event.key==='Enter')handleLearnFill('${stateKey}','${escapeHTML(blank.answer)}')">`;
+    } else {
+      html += `<span>${escapeHTML(part)}</span>`;
+    }
+  });
+  html += '</div>';
+
+  if (answered === undefined) {
+    html += `<button class="btn-check" onclick="handleLearnFill('${stateKey}','${escapeHTML(page.blanks[0].answer)}')">检查</button>`;
+  } else {
+    const isCorrect = answered;
+    html += `<div class="feedback ${isCorrect ? 'correct' : 'wrong'}">${isCorrect ? '\u2705 正确！' : '\u274C 正确答案是: ' + page.blanks[0].answer}${page.explanation ? ' ' + page.explanation : ''}</div>`;
+    html += renderContinueBtn(true);
+  }
+  return html;
+}
+
+function renderCodeInteraction(page, stateKey, answered) {
+  const editorKey = stateKey + '-code';
+  const savedCode = state.codeContents[editorKey] || page.starter || '';
+  const outputKey = stateKey + '-output';
+  const savedOutput = state.codeContents[outputKey] || '';
+
+  let html = `
+    <div class="code-editor-wrap">
+      <div class="code-editor-header">
+        <span>Python</span>
+        <button class="run-btn" onclick="handleLearnCodeRun('${stateKey}')" ${!pyodideReady ? 'disabled' : ''}>\u25B6 运行</button>
+      </div>
+      <textarea class="code-editor" id="editor-${stateKey}" data-key="${editorKey}" oninput="saveEditorContent(this)">${escapeHTML(savedCode)}</textarea>
+    </div>
+    <div class="code-output ${savedOutput.startsWith('Error:') ? 'error' : ''}" id="output-${stateKey}">${savedOutput || '<span class="empty">运行后会在这里显示结果</span>'}</div>
+  `;
+
+  if (answered !== undefined) {
+    html += `<div class="feedback correct">\u2705 ${page.successMsg}</div>`;
+    html += renderContinueBtn(true);
+  }
+  return html;
+}
+
+function renderContinueBtn(enabled) {
+  return `<button class="btn-primary" ${enabled ? '' : 'disabled'} onclick="nextPage()">继续 \u2192</button>`;
+}
+
+/* ── PRACTICE PHASE ── */
+function renderPracticePhase() {
+  const lesson = LESSONS[state.currentLesson];
+  const questions = PRACTICE_QUESTIONS[lesson.id];
+  if (!questions) return '<div class="page-card"><p>练习内容加载中...</p></div>';
+
+  // Check if all done
+  const allDone = state.currentPage >= questions.length;
+  if (allDone) {
+    return renderPracticeComplete();
+  }
+
+  const q = questions[state.currentPage];
+  const stateKey = `${state.currentLesson}-practice-${state.currentPage}`;
+  const answered = state.answered[stateKey];
+
+  let html = `
+    <div class="progress-wrap"><div class="progress-fill" style="width:${((state.currentPage + 1) / questions.length) * 100}%"></div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div class="question-counter">第 ${state.currentPage + 1} / ${questions.length} 题</div>
+      <div class="hearts-bar">${renderHearts()}</div>
+    </div>
+    <div class="page-card">
+  `;
+
+  html += `<div class="page-title" style="font-size:18px">${escapeHTML(q.question)}</div>`;
+
+  if (q.type === 'choice') {
+    html += renderPracticeChoice(q, stateKey, answered);
+  } else if (q.type === 'tf') {
+    html += renderPracticeTF(q, stateKey, answered);
+  } else if (q.type === 'fill') {
+    html += renderPracticeFill(q, stateKey, answered);
+  } else if (q.type === 'code') {
+    html += renderPracticeCode(q, stateKey, answered);
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function renderHearts() {
+  let h = '';
+  for (let i = 0; i < state.maxHearts; i++) {
+    h += `<span class="heart ${i < state.hearts ? '' : 'lost'}">\u2764\uFE0F</span>`;
+  }
+  return h;
+}
+
+function renderPracticeChoice(q, stateKey, answered) {
+  const letters = ['A', 'B', 'C', 'D'];
+  let html = '<div class="options">';
+  q.options.forEach((opt, i) => {
+    let cls = '';
+    let disabled = '';
+    if (answered !== undefined) {
+      disabled = 'disabled';
+      if (i === q.correct) cls = 'correct';
+      else if (i === answered) cls = 'wrong';
+    }
+    const displayOpt = opt.replace(/\\n/g, '<br>');
+    html += `<button class="opt-btn ${cls}" ${disabled} onclick="handlePracticeChoice(${i}, ${q.correct}, '${stateKey}')">
+      <span class="opt-letter">${letters[i]}</span>
+      <span>${displayOpt}</span>
+    </button>`;
+  });
+  html += '</div>';
+  if (answered !== undefined) {
+    const isCorrect = answered === q.correct;
+    html += `<div class="feedback ${isCorrect ? 'correct' : 'wrong'}">${isCorrect ? '\u2705 ' : '\u274C '}${q.explanation}</div>`;
+    html += renderContinueBtn(true);
+  }
+  return html;
+}
+
+function renderPracticeTF(q, stateKey, answered) {
+  let html = '<div class="tf-options">';
+  const opts = [true, false];
+  const labels = ['\u2705 \u6B63\u786E', '\u274C \u9519\u8BEF'];
+  opts.forEach((val, i) => {
+    let cls = '';
+    let disabled = '';
+    if (answered !== undefined) {
+      disabled = 'disabled';
+      if (val === q.correct) cls = 'correct';
+      else if (val === answered) cls = 'wrong';
+    }
+    html += `<button class="tf-btn ${cls}" ${disabled} onclick="handlePracticeTF(${val}, ${q.correct}, '${stateKey}')">${labels[i]}</button>`;
+  });
+  html += '</div>';
+  if (answered !== undefined) {
+    const isCorrect = answered === q.correct;
+    html += `<div class="feedback ${isCorrect ? 'correct' : 'wrong'}">${isCorrect ? '\u2705 ' : '\u274C '}${q.explanation}</div>`;
+    html += renderContinueBtn(true);
+  }
+  return html;
+}
+
+function renderPracticeFill(q, stateKey, answered) {
+  let html = '<div class="fill-blank-wrap">';
+  q.template.forEach((part) => {
+    if (part === '___') {
+      const blank = q.blanks[0];
+      const val = answered !== undefined ? blank.answer : (state.codeContents[stateKey] || '');
+      const cls = answered !== undefined ? (answered ? 'correct' : 'wrong') : '';
+      html += `<input class="fill-input ${cls}" style="width:${blank.width}px" value="${escapeHTML(val)}" data-key="${stateKey}" ${answered !== undefined ? 'readonly' : ''} onkeydown="if(event.key==='Enter')handlePracticeFill('${stateKey}','${escapeHTML(blank.answer)}')">`;
+    } else {
+      html += `<span>${escapeHTML(part)}</span>`;
+    }
+  });
+  html += '</div>';
+  if (answered === undefined) {
+    html += `<button class="btn-check" onclick="handlePracticeFill('${stateKey}','${escapeHTML(q.blanks[0].answer)}')">检查</button>`;
+  } else {
+    const isCorrect = answered;
+    html += `<div class="feedback ${isCorrect ? 'correct' : 'wrong'}">${isCorrect ? '\u2705 正确！' : '\u274C 正确答案是: ' + q.blanks[0].answer} ${q.explanation}</div>`;
+    html += renderContinueBtn(true);
+  }
+  return html;
+}
+
+function renderPracticeCode(q, stateKey, answered) {
+  const editorKey = stateKey + '-code';
+  const savedCode = state.codeContents[editorKey] || q.starter || '';
+  const outputKey = stateKey + '-output';
+  const savedOutput = state.codeContents[outputKey] || '';
+
+  let html = `
+    <div class="code-editor-wrap">
+      <div class="code-editor-header">
+        <span>Python</span>
+        <button class="run-btn" onclick="handlePracticeCodeRun('${stateKey}')" ${!pyodideReady ? 'disabled' : ''}>\u25B6 运行并检查</button>
+      </div>
+      <textarea class="code-editor" id="editor-${stateKey}" data-key="${editorKey}" oninput="saveEditorContent(this)">${escapeHTML(savedCode)}</textarea>
+    </div>
+    <div class="code-output ${savedOutput.startsWith('Error:') ? 'error' : ''}" id="output-${stateKey}">${savedOutput || '<span class="empty">运行后会在这里显示结果</span>'}</div>
+  `;
+  if (answered !== undefined) {
+    const isCorrect = answered;
+    html += `<div class="feedback ${isCorrect ? 'correct' : 'wrong'}">${isCorrect ? '\u2705 正确！' : '\u274C'} ${q.explanation}</div>`;
+    html += renderContinueBtn(true);
+  }
+  return html;
+}
+
+function renderPracticeComplete() {
+  const lesson = LESSONS[state.currentLesson];
+  showConfetti();
+  return `
+    <div class="page-card score-card">
+      <div class="score-big">\uD83C\uDF89</div>
+      <div class="page-title" style="text-align:center">练习完成！</div>
+      <div class="page-desc" style="text-align:center">${lesson.name} 的练习全部通过</div>
+      <div class="score-breakdown">
+        <div class="score-stat"><div class="score-stat-val xp">+${PRACTICE_QUESTIONS[lesson.id].length * 10}</div><div class="score-stat-label">获得 XP</div></div>
+      </div>
+      <button class="btn-primary" onclick="completeLesson()">继续学习 \u2192</button>
+    </div>
+  `;
+}
+
+/* ── CHECKPOINT ── */
+function renderCheckpoint(mainEl) {
+  const lesson = LESSONS[state.currentLesson];
+  const questions = CHECKPOINT_QUESTIONS[lesson.id];
+  if (!questions) { mainEl.innerHTML = '<div class="page-card"><p>检测内容加载中...</p></div>'; return; }
+
+  const status = state.lessonStatus[state.currentLesson];
+  if (status === 'locked') {
+    mainEl.innerHTML = `<div class="page-card welcome-card">
+      <h2>\uD83D\uDD12 未解锁</h2>
+      <p>完成前面的课程后才能参加检测。</p>
+    </div>`;
+    return;
+  }
+
+  // Check if already completed
+  if (state.checkpointScore[lesson.id] !== undefined) {
+    renderCheckpointResult(mainEl);
+    return;
+  }
+
+  // Check if all questions answered
+  const allAnswered = questions.every((_, i) => state.answered[`${state.currentLesson}-checkpoint-${i}`] !== undefined);
+  if (allAnswered) {
+    finishCheckpoint();
+    renderCheckpointResult(mainEl);
+    return;
+  }
+
+  const q = questions[state.currentPage];
+  const stateKey = `${state.currentLesson}-checkpoint-${state.currentPage}`;
+  const answered = state.answered[stateKey];
+
+  // Start timer if not started
+  if (!state.checkpointStartTime) {
+    state.checkpointStartTime = Date.now();
+  }
+
+  let html = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div class="question-counter">单元测试 \u00B7 第 ${state.currentPage + 1} / ${questions.length} 题</div>
+      <div class="timer-bar" id="timer">\u23F1 --:--</div>
+    </div>
+    <div class="progress-wrap"><div class="progress-fill" style="width:${((state.currentPage + 1) / questions.length) * 100}%"></div></div>
+    <div class="page-card">
+  `;
+
+  html += `<div class="page-title" style="font-size:18px">${escapeHTML(q.question)}</div>`;
+
+  if (q.type === 'choice') {
+    html += renderCheckpointChoice(q, stateKey, answered);
+  } else if (q.type === 'tf') {
+    html += renderCheckpointTF(q, stateKey, answered);
+  } else if (q.type === 'fill') {
+    html += renderCheckpointFill(q, stateKey, answered);
+  } else if (q.type === 'code') {
+    html += renderCheckpointCode(q, stateKey, answered);
+  }
+
+  html += '</div>';
+  mainEl.innerHTML = html;
+  attachEventListeners();
+  startCheckpointTimer();
+}
+
+function renderCheckpointChoice(q, stateKey, answered) {
+  const letters = ['A','B','C','D'];
+  let html = '<div class="options">';
+  q.options.forEach((opt, i) => {
+    let cls = ''; let disabled = '';
+    if (answered !== undefined) {
+      disabled = 'disabled';
+      if (i === q.correct) cls = 'correct';
+      else if (i === answered) cls = 'wrong';
+    }
+    html += `<button class="opt-btn ${cls}" ${disabled} onclick="handleCheckpointChoice(${i}, ${q.correct}, '${stateKey}')">
+      <span class="opt-letter">${letters[i]}</span><span>${escapeHTML(opt)}</span>
+    </button>`;
+  });
+  html += '</div>';
+  if (answered !== undefined) {
+    html += `<div class="feedback ${answered === q.correct ? 'correct' : 'wrong'}">${answered === q.correct ? '\u2705' : '\u274C'} ${q.explanation}</div>`;
+    html += renderContinueBtn(true);
+  }
+  return html;
+}
+
+function renderCheckpointTF(q, stateKey, answered) {
+  let html = '<div class="tf-options">';
+  [true, false].forEach((val, i) => {
+    let cls = ''; let disabled = '';
+    if (answered !== undefined) {
+      disabled = 'disabled';
+      if (val === q.correct) cls = 'correct';
+      else if (val === answered) cls = 'wrong';
+    }
+    html += `<button class="tf-btn ${cls}" ${disabled} onclick="handleCheckpointTF(${val}, ${q.correct}, '${stateKey}')">${val ? '\u2705 \u6B63\u786E' : '\u274C \u9519\u8BEF'}</button>`;
+  });
+  html += '</div>';
+  if (answered !== undefined) {
+    html += `<div class="feedback ${answered === q.correct ? 'correct' : 'wrong'}">${answered === q.correct ? '\u2705' : '\u274C'} ${q.explanation}</div>`;
+    html += renderContinueBtn(true);
+  }
+  return html;
+}
+
+function renderCheckpointFill(q, stateKey, answered) {
+  let html = '<div class="fill-blank-wrap">';
+  q.template.forEach((part) => {
+    if (part === '___') {
+      const blank = q.blanks[0];
+      const val = answered !== undefined ? blank.answer : (state.codeContents[stateKey] || '');
+      const cls = answered !== undefined ? (answered ? 'correct' : 'wrong') : '';
+      html += `<input class="fill-input ${cls}" style="width:${blank.width}px" value="${escapeHTML(val)}" data-key="${stateKey}" ${answered !== undefined ? 'readonly' : ''} onkeydown="if(event.key==='Enter')handleCheckpointFill('${stateKey}','${escapeHTML(blank.answer)}')">`;
+    } else {
+      html += `<span>${escapeHTML(part)}</span>`;
+    }
+  });
+  html += '</div>';
+  if (answered === undefined) {
+    html += `<button class="btn-check" onclick="handleCheckpointFill('${stateKey}','${escapeHTML(q.blanks[0].answer)}')">检查</button>`;
+  } else {
+    html += `<div class="feedback ${answered ? 'correct' : 'wrong'}">${answered ? '\u2705 正确！' : '\u274C 正确答案: ' + q.blanks[0].answer} ${q.explanation}</div>`;
+    html += renderContinueBtn(true);
+  }
+  return html;
+}
+
+function renderCheckpointCode(q, stateKey, answered) {
+  const editorKey = stateKey + '-code';
+  const savedCode = state.codeContents[editorKey] || q.starter || '';
+  const outputKey = stateKey + '-output';
+  const savedOutput = state.codeContents[outputKey] || '';
+
+  let html = `
+    <div class="code-editor-wrap">
+      <div class="code-editor-header">
+        <span>Python</span>
+        <button class="run-btn" onclick="handleCheckpointCodeRun('${stateKey}')" ${!pyodideReady ? 'disabled' : ''}>\u25B6 运行并检查</button>
+      </div>
+      <textarea class="code-editor" id="editor-${stateKey}" data-key="${editorKey}" oninput="saveEditorContent(this)">${escapeHTML(savedCode)}</textarea>
+    </div>
+    <div class="code-output" id="output-${stateKey}">${savedOutput || '<span class="empty">运行后会在这里显示结果</span>'}</div>
+  `;
+  if (answered !== undefined) {
+    html += `<div class="feedback ${answered ? 'correct' : 'wrong'}">${answered ? '\u2705 正确！' : '\u274C'} ${q.explanation}</div>`;
+    html += renderContinueBtn(true);
+  }
+  return html;
+}
+
+function renderCheckpointResult(mainEl) {
+  const lesson = LESSONS[state.currentLesson];
+  const result = state.checkpointScore[lesson.id];
+  const passed = result.score >= 50;
+  showConfetti();
+
+  mainEl.innerHTML = `
+    <div class="page-card score-card">
+      <div class="score-big">${result.score}%</div>
+      <div class="score-label">${passed ? '\uD83C\uDF89 \u901A\u8FC7\uFF01' : '\u{1F614} \u672A\u901A\u8FC7\uFF08\u9700\u8981 \u226550%\uFF09'}</div>
+      <div class="score-breakdown">
+        <div class="score-stat"><div class="score-stat-val" style="color:var(--success)">${result.correct}</div><div class="score-stat-label">正确</div></div>
+        <div class="score-stat"><div class="score-stat-val" style="color:var(--danger)">${result.total - result.correct}</div><div class="score-stat-label">错误</div></div>
+        <div class="score-stat"><div class="score-stat-val">${result.total}</div><div class="score-stat-label">总题数</div></div>
+      </div>
+      ${passed
+        ? `<button class="btn-primary" onclick="completeCheckpoint()">继续学习 \u2192</button>`
+        : `<button class="btn-primary" onclick="retryCheckpoint()">重新挑战</button>`
+      }
+    </div>
+  `;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ██  EVENT HANDLERS
+   ═══════════════════════════════════════════════════════════════ */
+
+function selectLesson(idx) {
+  if (state.lessonStatus[idx] === 'locked') return;
+  state.currentLesson = idx;
+  state.currentPage = 0;
+  const lesson = LESSONS[idx];
+  if (lesson.type === 'checkpoint') {
+    state.currentPhase = null;
+  } else {
+    // Determine phase
+    const learnStatus = state.phaseStatus[idx + '-learn'];
+    const practiceStatus = state.phaseStatus[idx + '-practice'];
+    if (learnStatus === 'completed' && practiceStatus !== 'completed') {
+      state.currentPhase = 'practice';
+    } else {
+      state.currentPhase = 'learn';
+    }
+  }
+  state.hearts = state.maxHearts;
+  saveState();
+  render();
+}
+
+function switchPhase(phase) {
+  const key = state.currentLesson + '-' + phase;
+  if (state.phaseStatus[key] === 'locked') return;
+  state.currentPhase = phase;
+  state.currentPage = 0;
+  if (phase === 'practice') state.hearts = state.maxHearts;
+  saveState();
+  renderMain();
+}
+
+function nextPage() {
+  const lesson = LESSONS[state.currentLesson];
+
+  if (lesson.type === 'checkpoint') {
+    const questions = CHECKPOINT_QUESTIONS[lesson.id];
+    if (state.currentPage < questions.length - 1) {
+      state.currentPage++;
+    } else {
+      finishCheckpoint();
+    }
+    saveState();
+    renderMain();
+    return;
+  }
+
+  if (state.currentPhase === 'learn') {
+    const pages = LEARN_PAGES[lesson.id];
+    if (state.currentPage < pages.length - 1) {
+      state.currentPage++;
+    } else {
+      // Learn phase complete
+      state.phaseStatus[state.currentLesson + '-learn'] = 'completed';
+      state.phaseStatus[state.currentLesson + '-practice'] = 'current';
+      state.currentPhase = 'practice';
+      state.currentPage = 0;
+      state.hearts = state.maxHearts;
+      state.xp += 20;
+    }
+  } else if (state.currentPhase === 'practice') {
+    const questions = PRACTICE_QUESTIONS[lesson.id];
+    if (state.currentPage < questions.length - 1) {
+      state.currentPage++;
+    } else {
+      state.currentPage = questions.length; // trigger complete screen
+    }
+  }
+  saveState();
+  renderMain();
+}
+
+function completeLesson() {
+  const idx = state.currentLesson;
+  state.lessonStatus[idx] = 'completed';
+  state.phaseStatus[idx + '-learn'] = 'completed';
+  state.phaseStatus[idx + '-practice'] = 'completed';
+  state.xp += PRACTICE_QUESTIONS[LESSONS[idx].id].length * 10;
+
+  // Unlock next
+  if (idx + 1 < LESSONS.length) {
+    if (state.lessonStatus[idx + 1] === 'locked') {
+      state.lessonStatus[idx + 1] = 'current';
+      const next = LESSONS[idx + 1];
+      if (next.type === 'checkpoint') {
+        state.phaseStatus[(idx + 1) + '-checkpoint'] = 'current';
+      } else {
+        state.phaseStatus[(idx + 1) + '-learn'] = 'current';
+        state.phaseStatus[(idx + 1) + '-practice'] = 'locked';
+      }
+    }
+    state.currentLesson = idx + 1;
+    state.currentPage = 0;
+    state.currentPhase = LESSONS[idx + 1].type === 'checkpoint' ? null : 'learn';
+  }
+  state.hearts = state.maxHearts;
+  saveState();
+  render();
+}
+
+function completeCheckpoint() {
+  const idx = state.currentLesson;
+  state.lessonStatus[idx] = 'completed';
+  state.checkpointStartTime = null;
+  if (state.checkpointTimer) { clearInterval(state.checkpointTimer); state.checkpointTimer = null; }
+
+  // Unlock next
+  if (idx + 1 < LESSONS.length) {
+    if (state.lessonStatus[idx + 1] === 'locked') {
+      state.lessonStatus[idx + 1] = 'current';
+      const next = LESSONS[idx + 1];
+      if (next.type === 'checkpoint') {
+        state.phaseStatus[(idx + 1) + '-checkpoint'] = 'current';
+      } else {
+        state.phaseStatus[(idx + 1) + '-learn'] = 'current';
+        state.phaseStatus[(idx + 1) + '-practice'] = 'locked';
+      }
+    }
+    state.currentLesson = idx + 1;
+    state.currentPage = 0;
+    state.currentPhase = LESSONS[idx + 1].type === 'checkpoint' ? null : 'learn';
+  }
+  state.hearts = state.maxHearts;
+  saveState();
+  render();
+}
+
+function retryCheckpoint() {
+  const lesson = LESSONS[state.currentLesson];
+  // Clear answers for this checkpoint
+  const questions = CHECKPOINT_QUESTIONS[lesson.id];
+  questions.forEach((_, i) => {
+    delete state.answered[`${state.currentLesson}-checkpoint-${i}`];
+    delete state.codeContents[`${state.currentLesson}-checkpoint-${i}`];
+    delete state.codeContents[`${state.currentLesson}-checkpoint-${i}-code`];
+    delete state.codeContents[`${state.currentLesson}-checkpoint-${i}-output`];
+  });
+  delete state.checkpointScore[lesson.id];
+  state.checkpointStartTime = null;
+  state.currentPage = 0;
+  saveState();
+  render();
+}
+
+function finishCheckpoint() {
+  const lesson = LESSONS[state.currentLesson];
+  const questions = CHECKPOINT_QUESTIONS[lesson.id];
+  let correct = 0;
+  questions.forEach((q, i) => {
+    const ans = state.answered[`${state.currentLesson}-checkpoint-${i}`];
+    if (q.type === 'choice') { if (ans === q.correct) correct++; }
+    else if (q.type === 'tf') { if (ans === q.correct) correct++; }
+    else if (q.type === 'fill') { if (ans === true) correct++; }
+    else if (q.type === 'code') { if (ans === true) correct++; }
+  });
+  const score = Math.round((correct / questions.length) * 100);
+  state.checkpointScore[lesson.id] = { score, correct, total: questions.length };
+  state.xp += correct * 15;
+  if (state.checkpointTimer) { clearInterval(state.checkpointTimer); state.checkpointTimer = null; }
+  saveState();
+}
+
+/* ── Learn phase handlers ── */
+function handleLearnChoice(selected, correct, stateKey) {
+  if (state.answered[stateKey] !== undefined) return;
+  state.answered[stateKey] = selected;
+  if (selected === correct) state.xp += 5;
+  saveState();
+  renderMain();
+}
+
+function handleLearnFill(stateKey, correctAnswer) {
+  if (state.answered[stateKey] !== undefined) return;
+  const input = document.querySelector(`input[data-key="${stateKey}"]`);
+  if (!input) return;
+  const val = input.value.trim();
+  state.codeContents[stateKey] = val;
+  const isCorrect = val.toLowerCase() === correctAnswer.toLowerCase();
+  state.answered[stateKey] = isCorrect;
+  if (isCorrect) state.xp += 5;
+  saveState();
+  renderMain();
+}
+
+async function handleLearnCodeRun(stateKey) {
+  const editorKey = stateKey + '-code';
+  const outputKey = stateKey + '-output';
+  const editor = document.getElementById('editor-' + stateKey);
+  if (!editor) return;
+  const code = editor.value;
+  state.codeContents[editorKey] = code;
+
+  const outputEl = document.getElementById('output-' + stateKey);
+  outputEl.textContent = '运行中...';
+  outputEl.className = 'code-output';
+
+  const result = await runPython(code);
+  if (result.error) {
+    outputEl.textContent = result.error;
+    outputEl.className = 'code-output error';
+    state.codeContents[outputKey] = 'Error: ' + result.error;
+  } else {
+    outputEl.textContent = result.stdout || '(无输出)';
+    outputEl.className = 'code-output' + (result.stdout ? '' : ' empty');
+    state.codeContents[outputKey] = result.stdout;
+  }
+
+  // Check if correct
+  const lesson = LESSONS[state.currentLesson];
+  const page = LEARN_PAGES[lesson.id][state.currentPage];
+  if (page.check && !result.error && page.check(result.stdout)) {
+    state.answered[stateKey] = true;
+    state.xp += 10;
+    saveState();
+    renderMain();
+  } else {
+    saveState();
+  }
+}
+
+/* ── Practice phase handlers ── */
+function handlePracticeChoice(selected, correct, stateKey) {
+  if (state.answered[stateKey] !== undefined) return;
+  state.answered[stateKey] = selected;
+  if (selected !== correct) {
+    state.hearts = Math.max(0, state.hearts - 1);
+  } else {
+    state.xp += 10;
+  }
+  saveState();
+  renderMain();
+}
+
+function handlePracticeTF(selected, correct, stateKey) {
+  if (state.answered[stateKey] !== undefined) return;
+  state.answered[stateKey] = selected;
+  if (selected !== correct) {
+    state.hearts = Math.max(0, state.hearts - 1);
+  } else {
+    state.xp += 10;
+  }
+  saveState();
+  renderMain();
+}
+
+function handlePracticeFill(stateKey, correctAnswer) {
+  if (state.answered[stateKey] !== undefined) return;
+  const input = document.querySelector(`input[data-key="${stateKey}"]`);
+  if (!input) return;
+  const val = input.value.trim();
+  state.codeContents[stateKey] = val;
+  const isCorrect = val.toLowerCase() === correctAnswer.toLowerCase();
+  state.answered[stateKey] = isCorrect;
+  if (!isCorrect) state.hearts = Math.max(0, state.hearts - 1);
+  else state.xp += 10;
+  saveState();
+  renderMain();
+}
+
+async function handlePracticeCodeRun(stateKey) {
+  const editorKey = stateKey + '-code';
+  const outputKey = stateKey + '-output';
+  const editor = document.getElementById('editor-' + stateKey);
+  if (!editor) return;
+  const code = editor.value;
+  state.codeContents[editorKey] = code;
+
+  const outputEl = document.getElementById('output-' + stateKey);
+  outputEl.textContent = '运行中...';
+  outputEl.className = 'code-output';
+
+  const result = await runPython(code);
+  const lesson = LESSONS[state.currentLesson];
+  const q = PRACTICE_QUESTIONS[lesson.id][state.currentPage];
+
+  if (result.error) {
+    outputEl.textContent = result.error;
+    outputEl.className = 'code-output error';
+    state.codeContents[outputKey] = result.error;
+    saveState();
+    return;
+  }
+
+  outputEl.textContent = result.stdout || '(无输出)';
+  outputEl.className = 'code-output';
+  state.codeContents[outputKey] = result.stdout;
+
+  const isCorrect = result.stdout.trim() === q.expected.trim();
+  state.answered[stateKey] = isCorrect;
+  if (!isCorrect) state.hearts = Math.max(0, state.hearts - 1);
+  else state.xp += 15;
+  saveState();
+  renderMain();
+}
+
+/* ── Checkpoint handlers ── */
+function handleCheckpointChoice(selected, correct, stateKey) {
+  if (state.answered[stateKey] !== undefined) return;
+  state.answered[stateKey] = selected;
+  saveState();
+  renderMain();
+}
+
+function handleCheckpointTF(selected, correct, stateKey) {
+  if (state.answered[stateKey] !== undefined) return;
+  state.answered[stateKey] = selected;
+  saveState();
+  renderMain();
+}
+
+function handleCheckpointFill(stateKey, correctAnswer) {
+  if (state.answered[stateKey] !== undefined) return;
+  const input = document.querySelector(`input[data-key="${stateKey}"]`);
+  if (!input) return;
+  const val = input.value.trim();
+  state.codeContents[stateKey] = val;
+  state.answered[stateKey] = val.toLowerCase() === correctAnswer.toLowerCase();
+  saveState();
+  renderMain();
+}
+
+async function handleCheckpointCodeRun(stateKey) {
+  const editorKey = stateKey + '-code';
+  const outputKey = stateKey + '-output';
+  const editor = document.getElementById('editor-' + stateKey);
+  if (!editor) return;
+  const code = editor.value;
+  state.codeContents[editorKey] = code;
+
+  const outputEl = document.getElementById('output-' + stateKey);
+  outputEl.textContent = '运行中...';
+  outputEl.className = 'code-output';
+
+  const result = await runPython(code);
+  const lesson = LESSONS[state.currentLesson];
+  const q = CHECKPOINT_QUESTIONS[lesson.id][state.currentPage];
+
+  if (result.error) {
+    outputEl.textContent = result.error;
+    outputEl.className = 'code-output error';
+    state.codeContents[outputKey] = result.error;
+    saveState();
+    return;
+  }
+
+  outputEl.textContent = result.stdout || '(无输出)';
+  outputEl.className = 'code-output';
+  state.codeContents[outputKey] = result.stdout;
+
+  state.answered[stateKey] = result.stdout.trim() === q.expected.trim();
+  saveState();
+  renderMain();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ██  UTILITIES
+   ═══════════════════════════════════════════════════════════════ */
+
+function escapeHTML(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function saveEditorContent(el) {
+  const key = el.getAttribute('data-key');
+  if (key) state.codeContents[key] = el.value;
+}
+
+function attachEventListeners() {
+  // Tab key in code editors -> insert spaces
+  document.querySelectorAll('.code-editor').forEach(editor => {
+    editor.addEventListener('keydown', function(e) {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = this.selectionStart;
+        const end = this.selectionEnd;
+        this.value = this.value.substring(0, start) + '    ' + this.value.substring(end);
+        this.selectionStart = this.selectionEnd = start + 4;
+        saveEditorContent(this);
+      }
+    });
+  });
+}
+
+function startCheckpointTimer() {
+  if (state.checkpointTimer) clearInterval(state.checkpointTimer);
+  state.checkpointTimer = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - state.checkpointStartTime) / 1000);
+    const remaining = Math.max(0, 30 * 60 - elapsed);
+    const mins = Math.floor(remaining / 60);
+    const secs = remaining % 60;
+    const timerEl = document.getElementById('timer');
+    if (timerEl) {
+      timerEl.textContent = `\u23F1 ${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+      if (remaining < 300) timerEl.className = 'timer-bar warning';
+    }
+    if (remaining <= 0) {
+      clearInterval(state.checkpointTimer);
+      finishCheckpoint();
+      renderMain();
+    }
+  }, 1000);
+}
+
+function showConfetti() {
+  const container = document.getElementById('confetti');
+  container.innerHTML = '';
+  const colors = ['#0080ff','#4da6ff','#00b894','#feca57','#ff6b6b','#a29bfe'];
+  for (let i = 0; i < 60; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = Math.random() * 100 + '%';
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.animationDelay = Math.random() * 1 + 's';
+    piece.style.animationDuration = (2 + Math.random() * 2) + 's';
+    piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+    piece.style.width = (6 + Math.random() * 8) + 'px';
+    piece.style.height = (6 + Math.random() * 8) + 'px';
+    container.appendChild(piece);
+  }
+  setTimeout(() => { container.innerHTML = ''; }, 4000);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ██  INITIALIZATION
+   ═══════════════════════════════════════════════════════════════ */
+
+loadState();
+initPhaseStatus();
+render();
+initPyodide();
+
+</script>
+</body>
+</html>
